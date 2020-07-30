@@ -21,11 +21,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/YaleSpinup/ec2-api/common"
+	"github.com/YaleSpinup/efs-api/common"
 )
 
 func TestPingHandler(t *testing.T) {
-	req, err := http.NewRequest("GET", "/v1/ec2/ping", nil)
+	req, err := http.NewRequest("GET", "/v1/efs/ping", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestPingHandler(t *testing.T) {
 }
 
 func TestVersionHandler(t *testing.T) {
-	req, err := http.NewRequest("GET", "/v1/ec2/version", nil)
+	req, err := http.NewRequest("GET", "/v1/efs/version", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
