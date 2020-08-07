@@ -46,6 +46,10 @@ func (e *EFS) DeleteFileSystem(ctx context.Context, id string) error {
 
 // ListFilesystems lists all filesystems if nil input is passed
 func (e *EFS) ListFileSystems(ctx context.Context, input *efs.DescribeFileSystemsInput) ([]string, error) {
+	if input == nil {
+		return nil, apierror.New(apierror.ErrBadRequest, "invalid input", nil)
+	}
+
 	log.Infof("listing efs filesystems with input %s", awsutil.Prettify(input))
 
 	input.MaxItems = aws.Int64(100)

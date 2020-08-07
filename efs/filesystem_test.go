@@ -259,6 +259,20 @@ func TestListFileSystems(t *testing.T) {
 	if _, err := e.ListFileSystems(context.TODO(), nil); err == nil {
 		t.Errorf("expected error for nil input, got %s", err)
 	}
+
+	expected := []string{}
+	for _, fs := range testFileSystems {
+		expected = append(expected, aws.StringValue(fs.FileSystemId))
+	}
+
+	out, err := e.ListFileSystems(context.TODO(), &efs.DescribeFileSystemsInput{})
+	if err != nil {
+		t.Errorf("expected nil error, got %s", err)
+	}
+
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("expected %+v, got %+v", expected, out)
+	}
 }
 
 func TestGetFileSystem(t *testing.T) {
