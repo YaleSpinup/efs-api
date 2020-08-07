@@ -32,6 +32,7 @@ func (s *server) PingHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("Ping/Pong")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(http.StatusOK)
+
 	w.Write([]byte("pong"))
 }
 
@@ -41,11 +42,7 @@ func (s *server) VersionHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 
-	data, err := json.Marshal(struct {
-		Version    string `json:"version"`
-		GitHash    string `json:"githash"`
-		BuildStamp string `json:"buildstamp"`
-	}{
+	data, err := json.Marshal(apiVersion{
 		Version:    fmt.Sprintf("%s%s", s.version.Version, s.version.VersionPrerelease),
 		GitHash:    s.version.GitHash,
 		BuildStamp: s.version.BuildStamp,

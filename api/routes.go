@@ -24,7 +24,13 @@ import (
 
 func (s *server) routes() {
 	api := s.router.PathPrefix("/v1/efs").Subrouter()
+
 	api.HandleFunc("/ping", s.PingHandler).Methods(http.MethodGet)
 	api.HandleFunc("/version", s.VersionHandler).Methods(http.MethodGet)
 	api.Handle("/metrics", promhttp.Handler()).Methods(http.MethodGet)
+
+	api.HandleFunc("/{account}/filesystems", s.FileSystemListHandler).Methods(http.MethodGet)
+	api.HandleFunc("/{account}/filesystems", s.FileSystemCreateHandler).Methods(http.MethodPost)
+	api.HandleFunc("/{account}/filesystems/{id}", s.FileSystemShowHandler).Methods(http.MethodGet)
+	api.HandleFunc("/{account}/filesystems/{id}", s.FileSystemDeleteHandler).Methods(http.MethodDelete)
 }

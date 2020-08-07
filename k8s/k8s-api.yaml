@@ -2,30 +2,30 @@
 apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
-  name: {{ .DockerName }}
+  name: efs-api
 spec:
   rules:
   - http:
       paths:
-      - path: {{ .UrlBase }}
+      - path: /v1/efs
         backend:
-          serviceName: {{ .DockerName }}
+          serviceName: efs-api
           servicePort: 8080
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .DockerName }}
+  name: efs-api
   labels:
-    app: {{ .DockerName }}
+    app: efs-api
     tier: api
   annotations:
     prometheus.io/scrape: 'true'
     prometheus.io/port:   '8080'
-    prometheus.io/path:   '{{ .UrlBase }}/metrics'
+    prometheus.io/path:   '/v1/efs/metrics'
 spec:
   selector:
-    app: {{ .DockerName }}
+    app: efs-api
     tier: api
   ports:
     - protocol: TCP
@@ -36,41 +36,41 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .DockerName }}
+  name: efs-api
   labels:
-    app: {{ .DockerName }}
+    app: efs-api
     tier: api
 spec:
   selector:
     matchLabels:
-      app: {{ .DockerName }}
+      app: efs-api
       tier: api
   strategy:
     type: RollingUpdate
   template:
     metadata:
       labels:
-        app: {{ .DockerName }}
+        app: efs-api
         tier: api
     spec:
       terminationGracePeriodSeconds: 10
       containers:
-      - name: {{ .DockerName }}
-        image: hub.docker.com/yaleits/{{ .DockerName }}
+      - name: efs-api
+        image: hub.docker.com/yaleits/efs-api
         volumeMounts:
-        - name: {{ .DockerName }}-config
+        - name: efs-api-config
           mountPath: "/app/config"
           readOnly: true
         livenessProbe:
           httpGet:
-            path: {{ .UrlBase }}/ping
+            path: /v1/efs/ping
             port: 8080
           initialDelaySeconds: 5
           periodSeconds: 3
       volumes:
-      - name: {{ .DockerName }}-config
+      - name: efs-api-config
         secret:
-          secretName: {{ .DockerName }}-config-json
+          secretName: efs-api-config-json
         # envFrom:
         #   - configMapRef:
         #       name: {{ .DockerName }}-config

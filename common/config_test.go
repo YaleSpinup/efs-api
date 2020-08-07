@@ -29,7 +29,10 @@ var testConfig = []byte(
 		  "provider1": {
 			"region": "us-east-1",
 			"akid": "key1",
-			"secret": "secret1"
+			"secret": "secret1",
+			"defaultKmsKeyId": "arn:aws:kms:us-east-1:11111111111:key/xyxyxyxyxyxyxyxyx",
+			"defaultSgs": ["sg-xxxxxx", "sg-yyyyyy"],
+			"defaultSubnets": ["subnet-xxxxxxx", "subnet-yyyyyy"]
 		  },
 		  "provider2": {
 			"region": "us-west-1",
@@ -49,9 +52,12 @@ func TestReadConfig(t *testing.T) {
 		ListenAddress: ":8000",
 		Accounts: map[string]Account{
 			"provider1": {
-				Region: "us-east-1",
-				Akid:   "key1",
-				Secret: "secret1",
+				Region:          "us-east-1",
+				Akid:            "key1",
+				Secret:          "secret1",
+				DefaultKmsKeyId: "arn:aws:kms:us-east-1:11111111111:key/xyxyxyxyxyxyxyxyx",
+				DefaultSgs:      []string{"sg-xxxxxx", "sg-yyyyyy"},
+				DefaultSubnets:  []string{"subnet-xxxxxxx", "subnet-yyyyyy"},
 			},
 			"provider2": {
 				Region: "us-west-1",
