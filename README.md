@@ -29,12 +29,12 @@ POST `/v1/efs/{account}/filesystems`
 
 | Response Code                 | Definition                      |
 | ----------------------------- | --------------------------------|
-| **200 OK**                    | return the list of buckets      |
+| **200 OK**                    | create a filesystem             |
 | **400 Bad Request**           | badly formed request            |
 | **404 Not Found**             | account not found               |
 | **500 Internal Server Error** | a server error occurred         |
 
-#### Example request body
+#### Example create request body
 
 ```json
 {
@@ -49,7 +49,7 @@ POST `/v1/efs/{account}/filesystems`
 }
 ```
 
-#### Example response body
+#### Example create response body
 
 ```json
 {
@@ -108,12 +108,12 @@ GET `/v1/efs/{account}/filesystems`
 
 | Response Code                 | Definition                      |
 | ----------------------------- | --------------------------------|
-| **200 OK**                    | return the list of buckets      |
+| **200 OK**                    | return the list of filesystems  |
 | **400 Bad Request**           | badly formed request            |
 | **404 Not Found**             | account not found               |
 | **500 Internal Server Error** | a server error occurred         |
 
-#### Example response body
+#### Example list response
 
 ```json
 [
@@ -129,12 +129,12 @@ GET `/v1/efs/{account}/filesystems/{id}`
 
 | Response Code                 | Definition                      |
 | ----------------------------- | --------------------------------|
-| **200 OK**                    | return the list of buckets      |
+| **200 OK**                    | return details of a filesystem  |
 | **400 Bad Request**           | badly formed request            |
 | **404 Not Found**             | account or filesystem not found |
 | **500 Internal Server Error** | a server error occurred         |
 
-#### Example response body
+#### Example show response
 
 ```json
 {
@@ -191,13 +191,13 @@ GET `/v1/efs/{account}/filesystems/{id}`
 
 DELETE `/v1/efs/{account}/filesystems/{id}`
 
-| Response Code                 | Definition                      |
-| ----------------------------- | --------------------------------|
-| **200 OK**                    | return the list of buckets      |
-| **400 Bad Request**           | badly formed request            |
-| **404 Not Found**             | account or filesystem not found |
-| **500 Internal Server Error** | a server error occurred         |
-
+| Response Code                 | Definition                               |
+| ----------------------------- | -----------------------------------------|
+| **202 Submitted**             | delete request is submitted              |
+| **400 Bad Request**           | badly formed request                     |
+| **404 Not Found**             | account or filesystem not found          |
+| **409 Conflict**              | filesystem is not in the available state |
+| **500 Internal Server Error** | a server error occurred                  |
 
 ## License
 
