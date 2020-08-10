@@ -71,11 +71,9 @@ func NewServer(config common.Config) error {
 	}
 
 	publicURLs := map[string]string{
-		"/v1/efs/ping":         "public",
-		"/v1/efs/version":      "public",
-		"/v1/efs/metrics":      "public",
-		"/v1/efs/swagger.json": "public",
-		"/v1/efs/docs":         "public",
+		"/v1/efs/ping":    "public",
+		"/v1/efs/version": "public",
+		"/v1/efs/metrics": "public",
 	}
 
 	// load routes

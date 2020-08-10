@@ -230,7 +230,7 @@ func (s *server) FileSystemDeleteHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	if status := aws.StringValue(filesystem.LifeCycleState); status != "available" {
-		msg := fmt.Sprintf("filesystem %s has status %s, cannot delete", fs, status)
+		msg := fmt.Sprintf("filesystem %s has status %s, cannot delete filesystems that are not 'available'", fs, status)
 		handleError(w, apierror.New(apierror.ErrConflict, msg, nil))
 		return
 	}
@@ -242,51 +242,22 @@ func (s *server) FileSystemDeleteHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	for _, mt := range mounttargets {
-		if status := aws.StringValue(filesystem.LifeCycleState); status != "available" {
+		if status := aws.StringValue(mt.LifeCycleState); status != "available" {
 			msg := fmt.Sprintf("filesystem %s mount target %s has status %s, cannot delete", fs, aws.StringValue(mt.MountTargetId), status)
 			handleError(w, apierror.New(apierror.ErrConflict, msg, nil))
 			return
 		}
-
-		if err := efsService.DeleteMountTarget(r.Context(), aws.StringValue(mt.MountTargetId)); err != nil {
-			handleError(w, err)
-			return
-		}
 	}
 
-	err = retry(5, 2*time.Second, func() error {
-		out, err := efsService.GetFileSystem(r.Context(), fs)
-		if err != nil {
-			log.Warnf("error getting filesystem %s during delete: %s", fs, err)
-			return err
+	go func() {
+		fsid := aws.StringValue(filesystem.FileSystemId)
+		log.Infof("starting background deletion of filesystem id: %s", fsid)
+		if err := efsService.DeleteFileSystemO(fsid); err != nil {
+			log.Errorf("Failed to delete filesystem id %s: %s", fsid, err)
 		}
-
-		if num := aws.Int64Value(out.NumberOfMountTargets); num > 0 {
-			log.Warnf("number of mount targets for filesystem %s > 0 (current: %d)", fs, num)
-			return fmt.Errorf("waiting for number of mount targets for filesystem %s to be 0 (current: %d)", fs, num)
-		}
-
-		return nil
-	})
-	if err != nil {
-		handleError(w, err)
-		return
-	}
-
-	err = retry(3, 2*time.Second, func() error {
-		if err := efsService.DeleteFileSystem(r.Context(), fs); err != nil {
-			log.Warnf("error deleting filesystem %s: %s", fs, err)
-			return err
-		}
-
-		return nil
-	})
-	if err != nil {
-		handleError(w, err)
-		return
-	}
+	}()
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusAccepted)
 	w.Write([]byte("OK"))
 }
