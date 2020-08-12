@@ -23,7 +23,8 @@ Authentication is accomplished via a pre-shared key.  This is done via the `X-Au
 
 ### Create a FileSystem
 
-Creating a filesystem generates an EFS filsystem, and mount targets in all of the configured subnets.
+Creating a filesystem generates an EFS filesystem, and mount targets in all of the configured subnets
+with the passed security groups.  If no security groups are passed, the default will be used.
 
 POST `/v1/efs/{account}/filesystems`
 
@@ -40,6 +41,7 @@ POST `/v1/efs/{account}/filesystems`
 {
     "Name": "myAwesomeFilesystem",
     "KmsKeyId": "arn:aws:kms:us-east-1:1234567890:key/0000000-1111-1111-1111-33333333333",
+    "Sgs": ["sg-abc123456789"],
     "Tags": [
         {
             "Key": "Bill.Me",

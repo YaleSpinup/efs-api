@@ -28,6 +28,8 @@ type FileSystemCreateRequest struct {
 	Name string
 	// KMSKeyId used to encrypt the filesystem
 	KmsKeyId string
+	// Security Group IDs to apply to the mount targets
+	Sgs []string
 	// Tags to apply to the filesystem
 	Tags []*Tag
 }

@@ -110,10 +110,15 @@ func (s *server) FileSystemCreateHandler(w http.ResponseWriter, r *http.Request)
 	// TODO rollback
 	mounttargets := []*efs.MountTargetDescription{}
 	for _, subnet := range efsService.DefaultSubnets {
+		if req.Sgs == nil {
+			log.Debugf("setting default security groups on mount target")
+			req.Sgs = efsService.DefaultSgs
+		}
+
 		mt, err := efsService.CreateMountTarget(r.Context(), &efs.CreateMountTargetInput{
-			FileSystemId: filesystem.FileSystemId,
-			// SecurityGroups: TODO,
-			SubnetId: aws.String(subnet),
+			FileSystemId:   filesystem.FileSystemId,
+			SecurityGroups: aws.StringSlice(req.Sgs),
+			SubnetId:       aws.String(subnet),
 		})
 
 		if err != nil {
