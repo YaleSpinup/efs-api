@@ -99,7 +99,7 @@ POST `/v1/efs/{account}/filesystems/{group}`
         },
         {
             "Key": "spinup:spaceid",
-            "Value": "somegroup"
+            "Value": "spindev-00001"
         },
         {
             "Key": "Bill.Me",
@@ -124,10 +124,10 @@ GET `/v1/efs/{account}/filesystems`
 
 ```json
 [
-    "fs-1234567",
-    "fs-7654321",
-    "fs-9876543",
-    "fs-abcdefg"
+    "spindev-00001/fs-1234567",
+    "spindev-00001/fs-7654321",
+    "spindev-00002/fs-9876543",
+    "spindev-00003/fs-abcdefg"
 ]
 ```
 
@@ -209,7 +209,7 @@ GET `/v1/efs/{account}/filesystems/{group}/{id}`
         },
         {
             "Key": "spinup:spaceid",
-            "Value": "somegroup"
+            "Value": "spindev-00001"
         },
         {
             "Key": "Bill.Me",
