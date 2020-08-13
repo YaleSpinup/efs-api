@@ -20,6 +20,7 @@ func (s *server) FileSystemCreateHandler(w http.ResponseWriter, r *http.Request)
 	w = LogWriter{w}
 	vars := mux.Vars(r)
 	account := vars["account"]
+	group := vars["group"]
 	efsService, ok := s.efsServices[account]
 	if !ok {
 		log.Errorf("account not found: %s", account)
@@ -44,18 +45,8 @@ func (s *server) FileSystemCreateHandler(w http.ResponseWriter, r *http.Request)
 		}
 	}()
 
-	// append org tag that will get applied to all resources that tag
-	req.Tags = append(req.Tags, &Tag{
-		Key:   "spinup:org",
-		Value: s.org,
-	})
-
-	if req.Name != "" {
-		req.Tags = append(req.Tags, &Tag{
-			Key:   "Name",
-			Value: req.Name,
-		})
-	}
+	// normalize the tags passed in the request
+	req.Tags = s.normalizeTags(req.Name, group, req.Tags)
 
 	// override encryption key if one was passed
 	if req.KmsKeyId == "" {
@@ -129,6 +120,7 @@ func (s *server) FileSystemCreateHandler(w http.ResponseWriter, r *http.Request)
 		mounttargets = append(mounttargets, mt)
 
 		// TODO rollback
+		// TODO tag mount target eni?
 	}
 
 	output := fileSystemResponseFromEFS(filesystem, mounttargets, nil)
@@ -144,22 +136,16 @@ func (s *server) FileSystemCreateHandler(w http.ResponseWriter, r *http.Request)
 	w.Write(j)
 }
 
-// FilesystemListHandler lists all of the filesystems by id
+// FileSystemListHandler lists all of the filesystems in a group by id
 func (s *server) FileSystemListHandler(w http.ResponseWriter, r *http.Request) {
 	w = LogWriter{w}
 	vars := mux.Vars(r)
 	account := vars["account"]
-	efsService, ok := s.efsServices[account]
-	if !ok {
-		log.Errorf("account not found: %s", account)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
+	group := vars["group"]
 
-	out, err := efsService.ListFileSystems(r.Context(), &efs.DescribeFileSystemsInput{})
+	out, err := s.listFileSystems(r.Context(), account, group)
 	if err != nil {
 		handleError(w, err)
-		return
 	}
 
 	output := listFileSystemsResponse(out)
@@ -180,11 +166,19 @@ func (s *server) FileSystemShowHandler(w http.ResponseWriter, r *http.Request) {
 	w = LogWriter{w}
 	vars := mux.Vars(r)
 	account := vars["account"]
+	group := vars["group"]
 	fs := vars["id"]
 
 	efsService, ok := s.efsServices[account]
 	if !ok {
 		log.Errorf("account not found: %s", account)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if exists, err := s.fileSystemExists(r.Context(), account, group, fs); err != nil {
+		handleError(w, err)
+	} else if !exists {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -219,11 +213,19 @@ func (s *server) FileSystemDeleteHandler(w http.ResponseWriter, r *http.Request)
 	w = LogWriter{w}
 	vars := mux.Vars(r)
 	account := vars["account"]
+	group := vars["group"]
 	fs := vars["id"]
 
 	efsService, ok := s.efsServices[account]
 	if !ok {
 		log.Errorf("account not found: %s", account)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if exists, err := s.fileSystemExists(r.Context(), account, group, fs); err != nil {
+		handleError(w, err)
+	} else if !exists {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
