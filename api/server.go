@@ -14,6 +14,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
+
 package api
 
 import (
@@ -25,6 +26,8 @@ import (
 	"time"
 
 	"github.com/YaleSpinup/efs-api/common"
+	"github.com/YaleSpinup/efs-api/efs"
+
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 
@@ -36,10 +39,11 @@ func init() {
 }
 
 type server struct {
-	router  *mux.Router
-	version common.Version
-	context context.Context
-	org string
+	efsServices map[string]efs.EFS
+	router      *mux.Router
+	version     common.Version
+	context     context.Context
+	org         string
 }
 
 // NewServer creates a new server and starts it
@@ -53,16 +57,17 @@ func NewServer(config common.Config) error {
 	}
 
 	s := server{
-		// ec2Services:         make(map[string]ec2.EC2),
-		router:  mux.NewRouter(),
-		version: config.Version,
-		context: ctx,
-		org: config.Org,
+		efsServices: make(map[string]efs.EFS),
+		router:      mux.NewRouter(),
+		version:     config.Version,
+		context:     ctx,
+		org:         config.Org,
 	}
 
 	// Create shared sessions
 	for name, c := range config.Accounts {
-		log.Debugf("Creating new efs-api service for account '%s' with key '%s' in region '%s' (org: %s)", name, c.Akid, c.Region, s.org)
+		log.Infof("Creating new efs-api service for account '%s' with key '%s' in region '%s' (org: %s)", name, c.Akid, c.Region, s.org)
+		s.efsServices[name] = efs.NewSession(c)
 	}
 
 	publicURLs := map[string]string{
@@ -77,6 +82,9 @@ func NewServer(config common.Config) error {
 	if config.ListenAddress == "" {
 		config.ListenAddress = ":8080"
 	}
+
+	// sh := middleware.Redoc
+
 	handler := handlers.RecoveryHandler()(handlers.LoggingHandler(os.Stdout, TokenMiddleware([]byte(config.Token), publicURLs, s.router)))
 	srv := &http.Server{
 		Handler:      handler,

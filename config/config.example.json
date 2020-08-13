@@ -4,12 +4,18 @@
     "someaccount": {
       "region": "us-east-1",
       "akid": "xxxxxxxxxxxxxxxxxxxxxxxx",
-      "secret": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+      "secret": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+      "defaultKmsKeyId": "arn:aws:kms:us-east-1:0123456789:key/zzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzz",
+      "defaultSgs": [],
+      "defaultSubnets": ["subnet-MjIyMjIyMjIyMjIyMjI", "subnet-MzMzMzMzMzMzMzMzMzM"]
     },
     "someotherservice": {
       "region": "us-middle-earth",
       "akid": "xxxxxxxxxxxxxxxxxxxxxxxx",
-      "secret": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+      "secret": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+      "defaultKmsKeyId": "arn:aws:kms:us-east-1:0987654321:key/xxxxxxx-xxxx-xxxx-xxxxx-xxxxxxxxxx",
+      "defaultSgs": [],
+      "defaultSubnets": ["subnet-MDAwMDAwMDAwMDAwMA", "subnet-MTExMTExMTExMTE"]
     }
   },
   "token": "xxxxxx",
