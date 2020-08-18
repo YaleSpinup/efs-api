@@ -29,7 +29,6 @@ func (s *server) routes() {
 	api.HandleFunc("/version", s.VersionHandler).Methods(http.MethodGet)
 	api.Handle("/metrics", promhttp.Handler()).Methods(http.MethodGet)
 
-	// TODO move to "/{account}/filesystems/{group}/{id}" ?
 	api.HandleFunc("/{account}/filesystems", s.FileSystemListHandler).Methods(http.MethodGet)
 	api.HandleFunc("/{account}/filesystems/{group}", s.FileSystemListHandler).Methods(http.MethodGet)
 	api.HandleFunc("/{account}/filesystems/{group}", s.FileSystemCreateHandler).Methods(http.MethodPost)

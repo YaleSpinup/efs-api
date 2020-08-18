@@ -229,8 +229,8 @@ func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTa
 	return &filesystem
 }
 
-// normalizTags strips the org and spaceid from the given tags and ensures they
-// are set to the API org and the group string passed to the request
+// normalizTags strips the org, spaceid and name from the given tags and ensures they
+// are set to the API org and the group string, name passed to the request
 func (s *server) normalizeTags(name, group string, tags []*Tag) []*Tag {
 	normalizedTags := []*Tag{}
 	for _, t := range tags {
@@ -281,7 +281,7 @@ func toEFSTags(tags []*Tag) []*efs.Tag {
 	return efsTags
 }
 
-// litFileSystems returns a list of elasticfilesystems with the given org tag and the group/spaceid tag
+// listFileSystems returns a list of elasticfilesystems with the given org tag and the group/spaceid tag
 func (s *server) listFileSystems(ctx context.Context, account, group string) ([]string, error) {
 	rgtService, ok := s.rgTaggingAPIServices[account]
 	if !ok {
@@ -337,7 +337,7 @@ func (s *server) listFileSystems(ctx context.Context, account, group string) ([]
 
 // fileSystemExists checks if a filesystem exists in a group/space by getting a list of all filesystems
 // tagged with the spaceid and checking against that list. alternatively, we could get the filesystem from
-// the API and check if it has the right tag, but this seems more dangerous and less repeatable.  in other
+// the API and check if it has the right tag, but that seems more dangerous and less repeatable.  in other
 // words, this process might be slower but is hopefully safer.
 func (s *server) fileSystemExists(ctx context.Context, account, group, fs string) (bool, error) {
 	log.Debugf("checking if filesystem %s is in the group %s", fs, group)
