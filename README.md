@@ -10,9 +10,10 @@ GET /v1/efs/version
 GET /v1/efs/metrics
 
 GET    /v1/efs/{account}/filesystems
-POST   /v1/efs/{account}/filesystems
-GET    /v1/efs/{account}/filesystems/{id}
-DELETE /v1/efs/{account}/filesystems/{id}
+GET    /v1/efs/{account}/filesystems/{group}
+POST   /v1/efs/{account}/filesystems/{group}
+GET    /v1/efs/{account}/filesystems/{group}/{id}
+DELETE /v1/efs/{account}/filesystems/{group}/{id}
 ```
 
 ## Authentication
@@ -26,7 +27,7 @@ Authentication is accomplished via a pre-shared key.  This is done via the `X-Au
 Creating a filesystem generates an EFS filesystem, and mount targets in all of the configured subnets
 with the passed security groups.  If no security groups are passed, the default will be used.
 
-POST `/v1/efs/{account}/filesystems`
+POST `/v1/efs/{account}/filesystems/{group}`
 
 | Response Code                 | Definition                      |
 | ----------------------------- | --------------------------------|
@@ -97,6 +98,10 @@ POST `/v1/efs/{account}/filesystems`
             "Value": "spindev"
         },
         {
+            "Key": "spinup:spaceid",
+            "Value": "spindev-00001"
+        },
+        {
             "Key": "Bill.Me",
             "Value": "Later"
         }
@@ -104,7 +109,7 @@ POST `/v1/efs/{account}/filesystems`
 }
 ```
 
-### List FileSystems by id
+### List FileSystems
 
 GET `/v1/efs/{account}/filesystems`
 
@@ -119,15 +124,36 @@ GET `/v1/efs/{account}/filesystems`
 
 ```json
 [
-    "fs-1234567",
-    "fs-7654321",
-    "fs-9876543"
+    "spindev-00001/fs-1234567",
+    "spindev-00001/fs-7654321",
+    "spindev-00002/fs-9876543",
+    "spindev-00003/fs-abcdefg"
+]
+```
+
+### List FileSystems by group id
+
+GET `/v1/efs/{account}/filesystems/{group}`
+
+| Response Code                 | Definition                      |
+| ----------------------------- | --------------------------------|
+| **200 OK**                    | return the list of filesystems  |
+| **400 Bad Request**           | badly formed request            |
+| **404 Not Found**             | account not found               |
+| **500 Internal Server Error** | a server error occurred         |
+
+#### Example list by group response
+
+```json
+[
+    "fs-9876543",
+    "fs-abcdefg"
 ]
 ```
 
 ### Get details about a FileSystem, including it's mount targets and access points
 
-GET `/v1/efs/{account}/filesystems/{id}`
+GET `/v1/efs/{account}/filesystems/{group}/{id}`
 
 | Response Code                 | Definition                      |
 | ----------------------------- | --------------------------------|
@@ -182,6 +208,10 @@ GET `/v1/efs/{account}/filesystems/{id}`
             "Value": "spindev"
         },
         {
+            "Key": "spinup:spaceid",
+            "Value": "spindev-00001"
+        },
+        {
             "Key": "Bill.Me",
             "Value": "Later"
         }
@@ -191,7 +221,7 @@ GET `/v1/efs/{account}/filesystems/{id}`
 
 ### Delete a FileSystem and all associated mount targets and access points
 
-DELETE `/v1/efs/{account}/filesystems/{id}`
+DELETE `/v1/efs/{account}/filesystems/{group}/{id}`
 
 | Response Code                 | Definition                               |
 | ----------------------------- | -----------------------------------------|

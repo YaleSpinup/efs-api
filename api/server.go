@@ -27,6 +27,7 @@ import (
 
 	"github.com/YaleSpinup/efs-api/common"
 	"github.com/YaleSpinup/efs-api/efs"
+	"github.com/YaleSpinup/efs-api/resourcegroupstaggingapi"
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -39,11 +40,12 @@ func init() {
 }
 
 type server struct {
-	efsServices map[string]efs.EFS
-	router      *mux.Router
-	version     common.Version
-	context     context.Context
-	org         string
+	efsServices          map[string]efs.EFS
+	rgTaggingAPIServices map[string]resourcegroupstaggingapi.ResourceGroupsTaggingAPI
+	router               *mux.Router
+	version              common.Version
+	context              context.Context
+	org                  string
 }
 
 // NewServer creates a new server and starts it
@@ -57,17 +59,19 @@ func NewServer(config common.Config) error {
 	}
 
 	s := server{
-		efsServices: make(map[string]efs.EFS),
-		router:      mux.NewRouter(),
-		version:     config.Version,
-		context:     ctx,
-		org:         config.Org,
+		efsServices:          make(map[string]efs.EFS),
+		rgTaggingAPIServices: make(map[string]resourcegroupstaggingapi.ResourceGroupsTaggingAPI),
+		router:               mux.NewRouter(),
+		version:              config.Version,
+		context:              ctx,
+		org:                  config.Org,
 	}
 
 	// Create shared sessions
 	for name, c := range config.Accounts {
 		log.Infof("Creating new efs-api service for account '%s' with key '%s' in region '%s' (org: %s)", name, c.Akid, c.Region, s.org)
 		s.efsServices[name] = efs.NewSession(c)
+		s.rgTaggingAPIServices[name] = resourcegroupstaggingapi.NewSession(c)
 	}
 
 	publicURLs := map[string]string{

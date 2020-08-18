@@ -1,9 +1,14 @@
 package api
 
 import (
+	"context"
+	"strings"
 	"time"
 
+	"github.com/YaleSpinup/apierror"
+	"github.com/YaleSpinup/efs-api/resourcegroupstaggingapi"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/aws/awsutil"
 	"github.com/aws/aws-sdk-go/service/efs"
 	log "github.com/sirupsen/logrus"
@@ -224,6 +229,34 @@ func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTa
 	return &filesystem
 }
 
+// normalizTags strips the org, spaceid and name from the given tags and ensures they
+// are set to the API org and the group string, name passed to the request
+func (s *server) normalizeTags(name, group string, tags []*Tag) []*Tag {
+	normalizedTags := []*Tag{}
+	for _, t := range tags {
+		if t.Key == "spinup:spaceid" || t.Key == "spinup:org" || t.Key == "Name" {
+			continue
+		}
+		normalizedTags = append(normalizedTags, t)
+	}
+
+	normalizedTags = append(normalizedTags,
+		&Tag{
+			Key:   "Name",
+			Value: name,
+		},
+		&Tag{
+			Key:   "spinup:org",
+			Value: s.org,
+		}, &Tag{
+			Key:   "spinup:spaceid",
+			Value: group,
+		})
+
+	log.Debugf("returning normalized tags: %+v", normalizedTags)
+	return normalizedTags
+}
+
 // fromEFSTags converts from EFS tags to api Tags
 func fromEFSTags(efsTags []*efs.Tag) []*Tag {
 	tags := make([]*Tag, 0, len(efsTags))
@@ -246,4 +279,88 @@ func toEFSTags(tags []*Tag) []*efs.Tag {
 		})
 	}
 	return efsTags
+}
+
+// listFileSystems returns a list of elasticfilesystems with the given org tag and the group/spaceid tag
+func (s *server) listFileSystems(ctx context.Context, account, group string) ([]string, error) {
+	rgtService, ok := s.rgTaggingAPIServices[account]
+	if !ok {
+		return nil, apierror.New(apierror.ErrNotFound, "account not found", nil)
+	}
+
+	// build up tag filters starting with the org
+	tagFilters := []*resourcegroupstaggingapi.TagFilter{
+		{
+			Key:   "spinup:org",
+			Value: []string{s.org},
+		},
+	}
+
+	// if a group was passed, append a filter for the space id
+	if group != "" {
+		tagFilters = append(tagFilters, &resourcegroupstaggingapi.TagFilter{
+			Key:   "spinup:spaceid",
+			Value: []string{group},
+		})
+	}
+
+	// get a list of elastic filesystems matching the tag filters
+	out, err := rgtService.GetResourcesWithTags(ctx, []string{"elasticfilesystem"}, tagFilters)
+	if err != nil {
+		return nil, err
+	}
+
+	fsList := make([]string, 0, len(out))
+	for _, fs := range out {
+		a, err := arn.Parse(aws.StringValue(fs.ResourceARN))
+		if err != nil {
+			log.Errorf("failed to parse ARN %s: %s", fs, err)
+			fsList = append(fsList, aws.StringValue(fs.ResourceARN))
+		}
+
+		fsid := strings.TrimPrefix(a.Resource, "file-system/")
+		if group == "" {
+			for _, t := range fs.Tags {
+				if aws.StringValue(t.Key) == "spinup:spaceid" {
+					fsid = aws.StringValue(t.Value) + "/" + fsid
+				}
+			}
+		}
+
+		fsList = append(fsList, fsid)
+	}
+
+	log.Debugf("returning list of filesystems in group %s: %+v", group, fsList)
+
+	return fsList, nil
+}
+
+// fileSystemExists checks if a filesystem exists in a group/space by getting a list of all filesystems
+// tagged with the spaceid and checking against that list. alternatively, we could get the filesystem from
+// the API and check if it has the right tag, but that seems more dangerous and less repeatable.  in other
+// words, this process might be slower but is hopefully safer.
+func (s *server) fileSystemExists(ctx context.Context, account, group, fs string) (bool, error) {
+	log.Debugf("checking if filesystem %s is in the group %s", fs, group)
+
+	list, err := s.listFileSystems(ctx, account, group)
+	if err != nil {
+		return false, err
+	}
+
+	for _, f := range list {
+		id := f
+		if arn.IsARN(f) {
+			if a, err := arn.Parse(f); err != nil {
+				log.Errorf("failed to parse ARN %s: %s", f, err)
+			} else {
+				id = strings.TrimPrefix(a.Resource, "file-system/")
+			}
+		}
+
+		if id == fs {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
