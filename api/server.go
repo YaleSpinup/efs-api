@@ -20,14 +20,17 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/YaleSpinup/efs-api/common"
 	"github.com/YaleSpinup/efs-api/efs"
 	"github.com/YaleSpinup/efs-api/resourcegroupstaggingapi"
+	"github.com/YaleSpinup/flywheel"
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -42,6 +45,7 @@ func init() {
 type server struct {
 	efsServices          map[string]efs.EFS
 	rgTaggingAPIServices map[string]resourcegroupstaggingapi.ResourceGroupsTaggingAPI
+	flywheel             *flywheel.Manager
 	router               *mux.Router
 	version              common.Version
 	context              context.Context
@@ -74,6 +78,12 @@ func NewServer(config common.Config) error {
 		s.rgTaggingAPIServices[name] = resourcegroupstaggingapi.NewSession(c)
 	}
 
+	manager, err := newFlywheelManager(config.Flywheel)
+	if err != nil {
+		return fmt.Errorf("failed to create new flywheel manager: %s", err)
+	}
+	s.flywheel = manager
+
 	publicURLs := map[string]string{
 		"/v1/efs/ping":    "public",
 		"/v1/efs/version": "public",
@@ -86,8 +96,6 @@ func NewServer(config common.Config) error {
 	if config.ListenAddress == "" {
 		config.ListenAddress = ":8080"
 	}
-
-	// sh := middleware.Redoc
 
 	handler := handlers.RecoveryHandler()(handlers.LoggingHandler(os.Stdout, TokenMiddleware([]byte(config.Token), publicURLs, s.router)))
 	srv := &http.Server{
@@ -103,6 +111,45 @@ func NewServer(config common.Config) error {
 	}
 
 	return nil
+}
+
+func newFlywheelManager(config common.Flywheel) (*flywheel.Manager, error) {
+	opts := []flywheel.ManagerOption{}
+
+	if config.RedisAddress != "" {
+		opts = append(opts, flywheel.WithRedisAddress(config.RedisAddress))
+	}
+
+	if config.RedisUsername != "" {
+		opts = append(opts, flywheel.WithRedisAddress(config.RedisUsername))
+	}
+
+	if config.RedisPassword != "" {
+		opts = append(opts, flywheel.WithRedisAddress(config.RedisPassword))
+	}
+
+	if config.RedisDatabase != "" {
+		db, err := strconv.Atoi(config.RedisDatabase)
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, flywheel.WithRedisDatabase(db))
+	}
+
+	if config.TTL != "" {
+		ttl, err := time.ParseDuration(config.TTL)
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, flywheel.WithTTL(ttl))
+	}
+
+	manager, err := flywheel.NewManager(config.Namespace, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return manager, nil
 }
 
 // LogWriter is an http.ResponseWriter

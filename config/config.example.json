@@ -18,6 +18,12 @@
       "defaultSubnets": ["subnet-MDAwMDAwMDAwMDAwMA", "subnet-MTExMTExMTExMTE"]
     }
   },
+  "flywheel": {
+    "namespace": "efsapi",
+    "redisAddress": "127.0.0.1:6379",
+    "redisDatabase": "0",
+    "ttl": "30m"
+  },
   "token": "xxxxxx",
   "logLevel": "info",
   "org": "localdev"
