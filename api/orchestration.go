@@ -62,8 +62,8 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 
 		// wait for the filesystem to become available
 		if err = retry(10, 2*time.Second, func() error {
-			log.Infof("checking if filesystem %s is available before continuing", fsid)
-			msgChan <- fmt.Sprintf("checking if filesystem %s is available", fsid)
+			msg := fmt.Sprintf("checking if filesystem %s is available before continuing", fsid)
+			msgChan <- msg
 
 			out, err := service.GetFileSystem(fsCtx, fsid)
 			if err != nil {
@@ -84,6 +84,7 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 		}
 
 		// TODO rollback
+
 		mounttargets := []*efs.MountTargetDescription{}
 		for _, subnet := range service.DefaultSubnets {
 			if req.Sgs == nil {
@@ -256,22 +257,35 @@ func (s *server) startTask(ctx context.Context, task *flywheel.Task) (chan<- str
 
 		if err := s.flywheel.Start(taskCtx, task); err != nil {
 			log.Errorf("failed to start flywheel task, won't be tracked: %s", err)
-			return
 		}
 
 		for {
 			select {
 			case msg := <-msgChan:
 				log.Info(msg)
-				s.flywheel.CheckIn(taskCtx, task.ID)
-				s.flywheel.Log(taskCtx, task.ID, msg)
+
+				if ferr := s.flywheel.CheckIn(taskCtx, task.ID); ferr != nil {
+					log.Errorf("failed to checkin task %s: %s", task.ID, ferr)
+				}
+
+				if ferr := s.flywheel.Log(taskCtx, task.ID, msg); ferr != nil {
+					log.Errorf("failed to log flywheel message for %s: %s", task.ID, ferr)
+				}
 			case err := <-errChan:
-				s.flywheel.Fail(taskCtx, task.ID, err.Error())
 				log.Error(err)
+
+				if ferr := s.flywheel.Fail(taskCtx, task.ID, err.Error()); ferr != nil {
+					log.Errorf("failed to fail flywheel task %s: %s", task.ID, ferr)
+				}
+
 				return
 			case <-ctx.Done():
-				s.flywheel.Complete(taskCtx, task.ID)
-				log.Info("marking the job done!")
+				log.Infof("marking task %s complete", task.ID)
+
+				if ferr := s.flywheel.Complete(taskCtx, task.ID); ferr != nil {
+					log.Errorf("failed to complete flywheel task %s: %s", task.ID, ferr)
+				}
+
 				return
 			}
 		}

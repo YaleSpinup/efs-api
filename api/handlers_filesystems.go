@@ -44,7 +44,7 @@ func (s *server) FileSystemCreateHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	w.Header().Set("X-Spinup-Task", task.ID)
+	w.Header().Set("X-Flywheel-Task", task.ID)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
 	w.Write(j)
@@ -143,7 +143,7 @@ func (s *server) FileSystemDeleteHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	w.Header().Set("X-Spinup-Task", task.ID)
+	w.Header().Set("X-Flywheel-Task", task.ID)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
 	w.Write([]byte("OK"))

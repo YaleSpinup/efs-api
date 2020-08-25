@@ -29,7 +29,7 @@ Authentication is accomplished via a pre-shared key.  This is done via the `X-Au
 Creating a filesystem generates an EFS filesystem, and mount targets in all of the configured subnets
 with the passed security groups.  If no security groups are passed, the default will be used.
 
-Create requests are asynchronous and returns a task ID in the header `X-Spinup-Task`.  This header can
+Create requests are asynchronous and returns a task ID in the header `X-Flywheel-Task`.  This header can
 be used to get the task information and logs from the flywheel HTTP endpoint.
 
 POST `/v1/efs/{account}/filesystems/{group}`
