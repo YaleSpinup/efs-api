@@ -67,6 +67,9 @@ type FileSystemResponse struct {
 	// The name of the filesystem.
 	Name string
 
+	// The current number of access points that the file system has.
+	NumberOfAccessPoints int64
+
 	// The current number of mount targets that the file system has.
 	NumberOfMountTargets int64
 
@@ -189,6 +192,7 @@ func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTa
 	}
 	filesystem.Tags = tags
 
+	filesystem.NumberOfAccessPoints = int64(len(aps))
 	accessPoints := make([]*AccessPoint, 0, len(aps))
 	for _, a := range aps {
 		log.Debugf("mapping accesspoint %s", awsutil.Prettify(a))
