@@ -185,7 +185,7 @@ func TestCreateFileSystem(t *testing.T) {
 	_, err := e.CreateFileSystem(context.TODO(), &efs.CreateFileSystemInput{})
 	if aerr, ok := err.(apierror.Error); ok {
 		if aerr.Code != apierror.ErrBadRequest {
-			t.Errorf("expected error code %s, got: %s", apierror.ErrConflict, aerr.Code)
+			t.Errorf("expected error code %s, got: %s", apierror.ErrBadRequest, aerr.Code)
 		}
 	} else {
 		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
@@ -215,7 +215,7 @@ func TestCreateFileSystem(t *testing.T) {
 	_, err = e.CreateFileSystem(context.TODO(), &efs.CreateFileSystemInput{})
 	if aerr, ok := err.(apierror.Error); ok {
 		if aerr.Code != apierror.ErrLimitExceeded {
-			t.Errorf("expected error code %s, got: %s", apierror.ErrConflict, aerr.Code)
+			t.Errorf("expected error code %s, got: %s", apierror.ErrLimitExceeded, aerr.Code)
 		}
 	} else {
 		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
@@ -235,7 +235,7 @@ func TestCreateFileSystem(t *testing.T) {
 	_, err = e.CreateFileSystem(context.TODO(), &efs.CreateFileSystemInput{})
 	if aerr, ok := err.(apierror.Error); ok {
 		if aerr.Code != apierror.ErrLimitExceeded {
-			t.Errorf("expected error code %s, got: %s", apierror.ErrConflict, aerr.Code)
+			t.Errorf("expected error code %s, got: %s", apierror.ErrLimitExceeded, aerr.Code)
 		}
 	} else {
 		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
@@ -270,15 +270,101 @@ func TestListFileSystems(t *testing.T) {
 		t.Errorf("expected nil error, got %s", err)
 	}
 
-	if !reflect.DeepEqual(expected, out) {
-		t.Errorf("expected %+v, got %+v", expected, out)
+	if !awsutil.DeepEqual(expected, out) {
+		t.Errorf("expected %+v, got %+v", awsutil.Prettify(expected), awsutil.Prettify(out))
 	}
 }
 
 func TestGetFileSystem(t *testing.T) {
-	t.Log("TODO")
+	e := EFS{Service: newMockEFSClient(t, nil)}
+
+	if _, err := e.GetFileSystem(context.TODO(), ""); err == nil {
+		t.Error("expected error for empty input, got nil")
+	}
+
+	for _, fs := range testFileSystems {
+		fsid := aws.StringValue(fs.FileSystemId)
+
+		t.Logf("getting filesystem %s", fsid)
+
+		out, err := e.GetFileSystem(context.TODO(), fsid)
+		if err != nil {
+			t.Errorf("expected nil error, got %s", err)
+		}
+
+		if !awsutil.DeepEqual(fs, out) {
+			t.Errorf("expected %+v, got %+v", awsutil.Prettify(fs), awsutil.Prettify(out))
+		}
+	}
+
 }
 
 func TestDeleteFileSystem(t *testing.T) {
-	t.Log("TODO")
+	e := EFS{Service: newMockEFSClient(t, nil)}
+
+	if err := e.DeleteFileSystem(context.TODO(), ""); err == nil {
+		t.Error("expected error for empty input, got nil")
+	}
+
+	for _, fs := range testFileSystems {
+		fsid := aws.StringValue(fs.FileSystemId)
+		t.Logf("testing delete of filesystem %s", fsid)
+
+		err := e.DeleteFileSystem(context.TODO(), fsid)
+		if err != nil {
+			t.Errorf("expected nil error, got %s", err)
+		}
+	}
+
+	e.Service.(*mockEFSClient).err = awserr.New(efs.ErrCodeBadRequest, "bad request", nil)
+	err := e.DeleteFileSystem(context.TODO(), "fs-123")
+	if aerr, ok := err.(apierror.Error); ok {
+		if aerr.Code != apierror.ErrBadRequest {
+			t.Errorf("expected error code %s, got: %s", apierror.ErrBadRequest, aerr.Code)
+		}
+	} else {
+		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
+	}
+
+	e.Service.(*mockEFSClient).err = awserr.New(efs.ErrCodeInternalServerError, "internal error", nil)
+	err = e.DeleteFileSystem(context.TODO(), "fs-123")
+	if aerr, ok := err.(apierror.Error); ok {
+		if aerr.Code != apierror.ErrServiceUnavailable {
+			t.Errorf("expected error code %s, got: %s", apierror.ErrServiceUnavailable, aerr.Code)
+		}
+	} else {
+		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
+	}
+
+	e.Service.(*mockEFSClient).err = awserr.New(efs.ErrCodeFileSystemNotFound, "not found", nil)
+	err = e.DeleteFileSystem(context.TODO(), "fs-123")
+	if aerr, ok := err.(apierror.Error); ok {
+		if aerr.Code != apierror.ErrNotFound {
+			t.Errorf("expected error code %s, got: %s", apierror.ErrNotFound, aerr.Code)
+		}
+	} else {
+		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
+	}
+
+	e.Service.(*mockEFSClient).err = awserr.New(efs.ErrCodeFileSystemInUse, "in use", nil)
+	err = e.DeleteFileSystem(context.TODO(), "fs-123")
+	if aerr, ok := err.(apierror.Error); ok {
+		if aerr.Code != apierror.ErrConflict {
+			t.Errorf("expected error code %s, got: %s", apierror.ErrConflict, aerr.Code)
+		}
+	} else {
+		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
+	}
+
+	// test non-aws error
+	e.Service.(*mockEFSClient).err = errors.New("things blowing up!")
+	err = e.DeleteFileSystem(context.TODO(), "fs-123")
+	if aerr, ok := err.(apierror.Error); ok {
+		if aerr.Code != apierror.ErrInternalError {
+			t.Errorf("expected error code %s, got: %s", apierror.ErrInternalError, aerr.Code)
+		}
+	} else {
+		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
+	}
+
 }
