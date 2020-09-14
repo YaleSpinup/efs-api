@@ -35,6 +35,7 @@ func (s *server) FileSystemCreateHandler(w http.ResponseWriter, r *http.Request)
 	output, task, err := s.filesystemCreate(r.Context(), account, group, &req)
 	if err != nil {
 		handleError(w, err)
+		return
 	}
 
 	j, err := json.Marshal(output)
@@ -60,6 +61,7 @@ func (s *server) FileSystemListHandler(w http.ResponseWriter, r *http.Request) {
 	out, err := s.listFileSystems(r.Context(), account, group)
 	if err != nil {
 		handleError(w, err)
+		return
 	}
 
 	output := listFileSystemsResponse(out)
