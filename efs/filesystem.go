@@ -101,3 +101,59 @@ func (e *EFS) GetFileSystem(ctx context.Context, id string) (*efs.FileSystemDesc
 
 	return output.FileSystems[0], nil
 }
+
+// SetFileSystemLifecycle sets a lifecycle transition policy on a filesystem
+func (e *EFS) SetFileSystemLifecycle(ctx context.Context, id, config string) error {
+	if id == "" {
+		return apierror.New(apierror.ErrBadRequest, "invalid input", nil)
+	}
+
+	log.Infof("setting filesystem lifecycle for %s to %s", id, config)
+
+	lifecycle := []*efs.LifecyclePolicy{}
+	if config != "" && config != "NONE" {
+		log.Debugf("setting lifecycle policy to %s", config)
+		lifecycle = []*efs.LifecyclePolicy{
+			{
+				TransitionToIA: aws.String(config),
+			},
+		}
+	}
+
+	out, err := e.Service.PutLifecycleConfigurationWithContext(ctx, &efs.PutLifecycleConfigurationInput{
+		FileSystemId:      aws.String(id),
+		LifecyclePolicies: lifecycle,
+	})
+	if err != nil {
+		return ErrCode("failed to set filesystem lifecycle", err)
+	}
+
+	log.Debugf("got output when setting %s lifecycle to %s: %s", id, config, awsutil.Prettify(out))
+
+	return nil
+}
+
+// GetFilesystemLifecycle gets the lifecycle transition configuration for a filesystem
+func (e *EFS) GetFilesystemLifecycle(ctx context.Context, id string) (string, error) {
+	if id == "" {
+		return "", apierror.New(apierror.ErrBadRequest, "invalid input", nil)
+	}
+
+	log.Infof("getting filesystem lifecycle configuration for efs filesystem %s", id)
+
+	output, err := e.Service.DescribeLifecycleConfigurationWithContext(ctx, &efs.DescribeLifecycleConfigurationInput{
+		FileSystemId: aws.String(id),
+	})
+	if err != nil {
+		return "", ErrCode("failed to get filesystem lifecycle configuration", err)
+	}
+
+	lifecycle := "NONE"
+	if output.LifecyclePolicies != nil && len(output.LifecyclePolicies) > 0 && output.LifecyclePolicies[0].TransitionToIA != nil {
+		lifecycle = aws.StringValue(output.LifecyclePolicies[0].TransitionToIA)
+	}
+
+	log.Debugf("got filesystem lifecycle configuration for %s: %+v", id, lifecycle)
+
+	return lifecycle, nil
+}

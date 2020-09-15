@@ -47,6 +47,7 @@ POST `/v1/efs/{account}/filesystems/{group}`
 {
     "Name": "myAwesomeFilesystem",
     "KmsKeyId": "arn:aws:kms:us-east-1:1234567890:key/0000000-1111-1111-1111-33333333333",
+    "LifeCycleConfiguration": "NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS",
     "Sgs": ["sg-abc123456789"],
     "Tags": [
         {
@@ -67,6 +68,7 @@ POST `/v1/efs/{account}/filesystems/{group}`
     "FileSystemId": "fs-9876543",
     "KmsKeyId": "arn:aws:kms:us-east-1:1234567890:key/0000000-1111-1111-1111-33333333333",
     "LifeCycleState": "creating",
+    "LifeCycleConfiguration": "NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS",
     "MountTargets": [
         {
             "AvailabilityZoneId": "use1-az2",
@@ -177,6 +179,7 @@ GET `/v1/efs/{account}/filesystems/{group}/{id}`
     "FileSystemId": "fs-9876543",
     "KmsKeyId": "arn:aws:kms:us-east-1:1234567890:key/0000000-1111-1111-1111-33333333333",
     "LifeCycleState": "available",
+    "LifeCycleConfiguration": "NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS",
     "MountTargets": [
         {
             "AvailabilityZoneId": "use1-az2",

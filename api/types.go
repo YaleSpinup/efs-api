@@ -37,6 +37,9 @@ type FileSystemCreateRequest struct {
 	Sgs []string
 	// Tags to apply to the filesystem
 	Tags []*Tag
+	// After how long to transition to Infrequent Access storage
+	// Valid values: NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS
+	LifeCycleConfiguration string
 }
 
 // FileSystemResponse represents a full filesystem service response
@@ -60,6 +63,10 @@ type FileSystemResponse struct {
 
 	// The lifecycle phase of the file system.
 	LifeCycleState string
+
+	// The lifecycle transition policy.
+	// Valid values: NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS
+	LifeCycleConfiguration string
 
 	// A list of mount targets associated with the filesystem.
 	MountTargets []*MountTarget
@@ -170,7 +177,7 @@ type Tag struct {
 }
 
 // fileSystemFromEFS maps an EFS filesystem, list of moutn targets, and list of access points to a common struct
-func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTargetDescription, aps []*efs.AccessPointDescription) *FileSystemResponse {
+func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTargetDescription, aps []*efs.AccessPointDescription, lifecycle string) *FileSystemResponse {
 	log.Debugf("mapping filesystem %s", awsutil.Prettify(fs))
 
 	filesystem := FileSystemResponse{
@@ -228,6 +235,11 @@ func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTa
 			ValueInIA:       aws.Int64Value(fs.SizeInBytes.ValueInIA),
 			ValueInStandard: aws.Int64Value(fs.SizeInBytes.ValueInStandard),
 		}
+	}
+
+	filesystem.LifeCycleConfiguration = lifecycle
+	if filesystem.LifeCycleConfiguration == "" {
+		filesystem.LifeCycleConfiguration = "NONE"
 	}
 
 	return &filesystem
