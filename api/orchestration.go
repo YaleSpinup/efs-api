@@ -26,6 +26,19 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 		req.KmsKeyId = service.DefaultKmsKeyId
 	}
 
+	switch req.LifeCycleConfiguration {
+	case "", "NONE":
+		req.LifeCycleConfiguration = "NONE"
+	case "AFTER_7_DAYS",
+		"AFTER_14_DAYS",
+		"AFTER_30_DAYS",
+		"AFTER_60_DAYS",
+		"AFTER_90_DAYS":
+		log.Debugf("setting Tansition to Infrequent access to %s", req.LifeCycleConfiguration)
+	default:
+		return nil, nil, apierror.New(apierror.ErrBadRequest, "invalid lifecycle policy, valid values are NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS", nil)
+	}
+
 	// generate a new task to track and start it
 	task := flywheel.NewTask()
 	filesystem, err := service.CreateFileSystem(ctx, &efs.CreateFileSystemInput{
@@ -83,6 +96,11 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 			return
 		}
 
+		if err := service.SetFileSystemLifecycle(fsCtx, fsid, req.LifeCycleConfiguration); err != nil {
+			errChan <- fmt.Errorf("failed to set lifecycle for filesystem %s: %s", fsid, err.Error())
+			return
+		}
+
 		// TODO rollback
 
 		mounttargets := []*efs.MountTargetDescription{}
@@ -134,7 +152,7 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 		msgChan <- fmt.Sprintf("created %d mount targets for fs %s", len(mounttargets), fsid)
 	}()
 
-	return fileSystemResponseFromEFS(filesystem, nil, nil), task, nil
+	return fileSystemResponseFromEFS(filesystem, nil, nil, req.LifeCycleConfiguration), task, nil
 }
 
 func (s *server) filesystemDelete(ctx context.Context, account, group, fs string) (*flywheel.Task, error) {
