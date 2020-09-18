@@ -48,6 +48,7 @@ POST `/v1/efs/{account}/filesystems/{group}`
     "Name": "myAwesomeFilesystem",
     "KmsKeyId": "arn:aws:kms:us-east-1:1234567890:key/0000000-1111-1111-1111-33333333333",
     "LifeCycleConfiguration": "NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS",
+    "BackupPolicy": "ENABLED | DISABLED",
     "Sgs": ["sg-abc123456789"],
     "Tags": [
         {
@@ -63,31 +64,16 @@ POST `/v1/efs/{account}/filesystems/{group}`
 ```json
 {
     "AccessPoints": [],
+    "BackupPolicy": "ENABLED | DISABLED",
     "CreationTime": "2020-08-06T11:14:45Z",
     "FileSystemArn": "arn:aws:elasticfilesystem:us-east-1:1234567890:file-system/fs-9876543",
     "FileSystemId": "fs-9876543",
     "KmsKeyId": "arn:aws:kms:us-east-1:1234567890:key/0000000-1111-1111-1111-33333333333",
     "LifeCycleState": "creating",
     "LifeCycleConfiguration": "NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS",
-    "MountTargets": [
-        {
-            "AvailabilityZoneId": "use1-az2",
-            "AvailabilityZoneName": "us-east-1a",
-            "IpAddress": "10.1.2.111",
-            "LifeCycleState": "creating",
-            "MountTargetId": "fsmt-1111111",
-            "SubnetId": "subnet-MjIyMjIyMjIyMjIyMjI"
-        },
-        {
-            "AvailabilityZoneId": "use1-az1",
-            "AvailabilityZoneName": "us-east-1d",
-            "IpAddress": "10.1.3.111",
-            "LifeCycleState": "creating",
-            "MountTargetId": "fsmt-2222222",
-            "SubnetId": "subnet-MzMzMzMzMzMzMzMzMzM"
-        }
-    ],
+    "MountTargets": [],
     "Name": "myAwesomeFilesystem",
+    "NumberOfAccessPoints": 0,
     "NumberOfMountTargets": 0,
     "SizeInBytes": {
         "Timestamp": "0001-01-01T00:00:00Z",
@@ -174,6 +160,7 @@ GET `/v1/efs/{account}/filesystems/{group}/{id}`
 ```json
 {
     "AccessPoints": [],
+    "BackupPolicy": "ENABLED | ENABLING | DISABLED | DISABLING",
     "CreationTime": "2020-08-06T11:14:45Z",
     "FileSystemArn": "arn:aws:elasticfilesystem:us-east-1:1234567890:file-system/fs-9876543",
     "FileSystemId": "fs-9876543",
@@ -199,6 +186,7 @@ GET `/v1/efs/{account}/filesystems/{group}/{id}`
         }
     ],
     "Name": "myAwesomeFilesystem",
+    "NumberOfAccessPoints": 0,
     "NumberOfMountTargets": 2,
     "SizeInBytes": {
         "Timestamp": "0001-01-01T00:00:00Z",
