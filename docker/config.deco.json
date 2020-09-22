@@ -6,7 +6,7 @@
       "akid": "{{ .spinup_akid }}",
       "secret": "{{ .spinup_secret }}",
       "defaultSgs": ["{{ .spinup_default_sg }}"],
-      "defaultSubnets": ["{{ .spinup_default_subnet }}"],
+      "defaultSubnets": {{ .spinup_default_subnet }},
       "defaultKmsKeyId": "{{ .spinup_default_kms_key_id }}"
     },
     "spinupsec": {
@@ -14,7 +14,7 @@
       "akid": "{{ .spinupsec_akid }}",
       "secret": "{{ .spinupsec_secret }}",
       "defaultSgs": ["{{ .spinupsec_default_sg }}"],
-      "defaultSubnets": ["{{ .spinupsec_default_subnet }}"],
+      "defaultSubnets": {{ .spinupsec_default_subnet }},
       "defaultKmsKeyId": "{{ .spinupsec_default_kms_key_id }}"
     }
   },

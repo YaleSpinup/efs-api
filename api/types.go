@@ -31,15 +31,23 @@ type listFileSystemsResponse []string
 type FileSystemCreateRequest struct {
 	// Name of the filesystem
 	Name string
+
+	// BackupPolicy is the backup policy/status for the filesystem
+	// Valid values are ENABLED | DISABLED
+	BackupPolicy string
+
 	// KMSKeyId used to encrypt the filesystem
 	KmsKeyId string
-	// Security Group IDs to apply to the mount targets
-	Sgs []string
-	// Tags to apply to the filesystem
-	Tags []*Tag
+
 	// After how long to transition to Infrequent Access storage
 	// Valid values: NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS
 	LifeCycleConfiguration string
+
+	// Security Group IDs to apply to the mount targets
+	Sgs []string
+
+	// Tags to apply to the filesystem
+	Tags []*Tag
 }
 
 // FileSystemResponse represents a full filesystem service response
@@ -48,6 +56,10 @@ type FileSystemCreateRequest struct {
 type FileSystemResponse struct {
 	// list of access points associated with the filesystem
 	AccessPoints []*AccessPoint
+
+	// BackupPolicy is the backup policy/status for the filesystem
+	// Valid values are ENABLED | ENABLING | DISABLED | DISABLING
+	BackupPolicy string
 
 	// The time that the file system was created, in seconds (since 1970-01-01T00:00:00Z).
 	CreationTime time.Time
@@ -177,10 +189,11 @@ type Tag struct {
 }
 
 // fileSystemFromEFS maps an EFS filesystem, list of moutn targets, and list of access points to a common struct
-func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTargetDescription, aps []*efs.AccessPointDescription, lifecycle string) *FileSystemResponse {
+func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTargetDescription, aps []*efs.AccessPointDescription, backup, lifecycle string) *FileSystemResponse {
 	log.Debugf("mapping filesystem %s", awsutil.Prettify(fs))
 
 	filesystem := FileSystemResponse{
+		BackupPolicy:         backup,
 		CreationTime:         aws.TimeValue(fs.CreationTime),
 		FileSystemArn:        aws.StringValue(fs.FileSystemArn),
 		FileSystemId:         aws.StringValue(fs.FileSystemId),

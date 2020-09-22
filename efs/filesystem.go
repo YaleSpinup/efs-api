@@ -157,3 +157,50 @@ func (e *EFS) GetFilesystemLifecycle(ctx context.Context, id string) (string, er
 
 	return lifecycle, nil
 }
+
+// SetFileSystemBackup sets a lifecycle transition policy on a filesystem
+func (e *EFS) SetFileSystemBackup(ctx context.Context, id, status string) error {
+	if id == "" {
+		return apierror.New(apierror.ErrBadRequest, "invalid input", nil)
+	}
+
+	log.Infof("setting filesystem filesystem backup policy status for %s to %s", id, status)
+
+	out, err := e.Service.PutBackupPolicyWithContext(ctx, &efs.PutBackupPolicyInput{
+		FileSystemId: aws.String(id),
+		BackupPolicy: &efs.BackupPolicy{
+			Status: aws.String(status),
+		},
+	})
+	if err != nil {
+		return ErrCode("failed to set filesystem backup policy status", err)
+	}
+
+	log.Debugf("got output when setting %s backup policy status to to %s: %s", id, status, awsutil.Prettify(out))
+
+	return nil
+}
+
+// GetFilesystemBackup gets the backup policy status for a filesystem
+func (e *EFS) GetFilesystemBackup(ctx context.Context, id string) (string, error) {
+	if id == "" {
+		return "", apierror.New(apierror.ErrBadRequest, "invalid input", nil)
+	}
+
+	log.Infof("getting filesystem backup policy status for efs filesystem %s", id)
+
+	out, err := e.Service.DescribeBackupPolicyWithContext(ctx, &efs.DescribeBackupPolicyInput{
+		FileSystemId: aws.String(id),
+	})
+	if err != nil {
+		return "", ErrCode("failed to get filesystem backup policy status", err)
+	}
+
+	log.Debugf("got filesystem backup policy status for %s: %+v", id, awsutil.Prettify(out))
+
+	if out.BackupPolicy != nil {
+		return aws.StringValue(out.BackupPolicy.Status), nil
+	}
+
+	return "DISABLED", nil
+}

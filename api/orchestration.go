@@ -36,7 +36,16 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 		"AFTER_90_DAYS":
 		log.Debugf("setting Tansition to Infrequent access to %s", req.LifeCycleConfiguration)
 	default:
-		return nil, nil, apierror.New(apierror.ErrBadRequest, "invalid lifecycle policy, valid values are NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS", nil)
+		return nil, nil, apierror.New(apierror.ErrBadRequest, "invalid lifecycle configuration, valid values are NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS", nil)
+	}
+
+	switch req.BackupPolicy {
+	case "":
+		req.BackupPolicy = "DISABLED"
+	case "DISABLED", "ENABLED":
+		log.Debugf("setting backup policy to %s", req.BackupPolicy)
+	default:
+		return nil, nil, apierror.New(apierror.ErrBadRequest, "invalid backup policy, valid values are ENABLED | DISABLED", nil)
 	}
 
 	// generate a new task to track and start it
@@ -96,6 +105,11 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 			return
 		}
 
+		if err := service.SetFileSystemBackup(fsCtx, fsid, req.BackupPolicy); err != nil {
+			errChan <- fmt.Errorf("failed to set backup policy for filesystem %s: %s", fsid, err.Error())
+			return
+		}
+
 		if err := service.SetFileSystemLifecycle(fsCtx, fsid, req.LifeCycleConfiguration); err != nil {
 			errChan <- fmt.Errorf("failed to set lifecycle for filesystem %s: %s", fsid, err.Error())
 			return
@@ -152,7 +166,7 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 		msgChan <- fmt.Sprintf("created %d mount targets for fs %s", len(mounttargets), fsid)
 	}()
 
-	return fileSystemResponseFromEFS(filesystem, nil, nil, req.LifeCycleConfiguration), task, nil
+	return fileSystemResponseFromEFS(filesystem, nil, nil, req.BackupPolicy, req.LifeCycleConfiguration), task, nil
 }
 
 func (s *server) filesystemDelete(ctx context.Context, account, group, fs string) (*flywheel.Task, error) {

@@ -77,6 +77,16 @@ var testFileSystemLifecycleConfigurations = map[string]string{
 	"fs-55555555": "AFTER_90_DAYS",
 }
 
+var testFileSystemBackupPolicies = map[string]string{
+	"fs-00000000": "",
+	"fs-11111111": "ENABLED",
+	"fs-22222222": "DISABLED",
+	"fs-33333333": "ENABLING",
+	"fs-44444444": "DISABLING",
+	"fs-55555555": "ENABLED",
+	"fs-66666666": "DISABLED",
+}
+
 func (m *mockEFSClient) CreateFileSystemWithContext(ctx context.Context, input *efs.CreateFileSystemInput, opts ...request.Option) (*efs.FileSystemDescription, error) {
 	if m.err != nil {
 		return nil, m.err
@@ -192,6 +202,42 @@ func (m *mockEFSClient) PutLifecycleConfigurationWithContext(ctx context.Context
 					{
 						TransitionToIA: aws.String(lc),
 					},
+				},
+			}, nil
+		}
+	}
+
+	return nil, awserr.New(efs.ErrCodeFileSystemNotFound, "Filesystem not found", nil)
+}
+
+func (m *mockEFSClient) DescribeBackupPolicyWithContext(ctx context.Context, input *efs.DescribeBackupPolicyInput, opts ...request.Option) (*efs.DescribeBackupPolicyOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+
+	for fs, bp := range testFileSystemBackupPolicies {
+		if aws.StringValue(input.FileSystemId) == fs {
+			return &efs.DescribeBackupPolicyOutput{
+				BackupPolicy: &efs.BackupPolicy{
+					Status: aws.String(bp),
+				},
+			}, nil
+		}
+	}
+
+	return nil, awserr.New(efs.ErrCodeFileSystemNotFound, "Filesystem not found", nil)
+}
+
+func (m *mockEFSClient) PutBackupPolicyWithContext(ctx context.Context, input *efs.PutBackupPolicyInput, opts ...request.Option) (*efs.PutBackupPolicyOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+
+	for fs, bp := range testFileSystemBackupPolicies {
+		if aws.StringValue(input.FileSystemId) == fs {
+			return &efs.PutBackupPolicyOutput{
+				BackupPolicy: &efs.BackupPolicy{
+					Status: aws.String(bp),
 				},
 			}, nil
 		}
@@ -560,6 +606,158 @@ func TestSetFileSystemLifecycle(t *testing.T) {
 	// test non-aws error
 	e.Service.(*mockEFSClient).err = errors.New("things blowing up!")
 	err = e.SetFileSystemLifecycle(context.TODO(), "fs-123", "AFTER_7_DAYS")
+	if aerr, ok := err.(apierror.Error); ok {
+		if aerr.Code != apierror.ErrInternalError {
+			t.Errorf("expected error code %s, got: %s", apierror.ErrInternalError, aerr.Code)
+		}
+	} else {
+		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
+	}
+}
+
+func TestGetFilesystemBackup(t *testing.T) {
+	e := EFS{Service: newMockEFSClient(t, nil)}
+
+	if _, err := e.GetFilesystemBackup(context.TODO(), ""); err == nil {
+		t.Error("expected error for empty input, got nil")
+	}
+
+	for fs, bp := range testFileSystemBackupPolicies {
+		t.Logf("getting filesystem lifecycle config for %s", fs)
+
+		out, err := e.GetFilesystemBackup(context.TODO(), fs)
+		if err != nil {
+			t.Errorf("expected nil error, got %s", err)
+		}
+
+		if bp != out {
+			t.Errorf("expected %s, got %s", bp, out)
+		}
+	}
+
+	if _, err := e.GetFilesystemBackup(context.TODO(), "fs-missing"); err == nil {
+		t.Error("expected error for missing filesystem, got nil")
+	}
+
+	e.Service.(*mockEFSClient).err = awserr.New(efs.ErrCodeBadRequest, "bad request", nil)
+	_, err := e.GetFilesystemBackup(context.TODO(), "fs-123")
+	if aerr, ok := err.(apierror.Error); ok {
+		if aerr.Code != apierror.ErrBadRequest {
+			t.Errorf("expected error code %s, got: %s", apierror.ErrBadRequest, aerr.Code)
+		}
+	} else {
+		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
+	}
+
+	e.Service.(*mockEFSClient).err = awserr.New(efs.ErrCodeInternalServerError, "internal error", nil)
+	_, err = e.GetFilesystemBackup(context.TODO(), "fs-123")
+	if aerr, ok := err.(apierror.Error); ok {
+		if aerr.Code != apierror.ErrServiceUnavailable {
+			t.Errorf("expected error code %s, got: %s", apierror.ErrServiceUnavailable, aerr.Code)
+		}
+	} else {
+		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
+	}
+
+	e.Service.(*mockEFSClient).err = awserr.New(efs.ErrCodeFileSystemNotFound, "not found", nil)
+	_, err = e.GetFilesystemBackup(context.TODO(), "fs-123")
+	if aerr, ok := err.(apierror.Error); ok {
+		if aerr.Code != apierror.ErrNotFound {
+			t.Errorf("expected error code %s, got: %s", apierror.ErrNotFound, aerr.Code)
+		}
+	} else {
+		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
+	}
+
+	e.Service.(*mockEFSClient).err = awserr.New(efs.ErrCodeFileSystemInUse, "in use", nil)
+	_, err = e.GetFilesystemBackup(context.TODO(), "fs-123")
+	if aerr, ok := err.(apierror.Error); ok {
+		if aerr.Code != apierror.ErrConflict {
+			t.Errorf("expected error code %s, got: %s", apierror.ErrConflict, aerr.Code)
+		}
+	} else {
+		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
+	}
+
+	// test non-aws error
+	e.Service.(*mockEFSClient).err = errors.New("things blowing up!")
+	_, err = e.GetFilesystemBackup(context.TODO(), "fs-123")
+	if aerr, ok := err.(apierror.Error); ok {
+		if aerr.Code != apierror.ErrInternalError {
+			t.Errorf("expected error code %s, got: %s", apierror.ErrInternalError, aerr.Code)
+		}
+	} else {
+		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
+	}
+
+}
+
+func TestSetFileSystemBackup(t *testing.T) {
+	e := EFS{Service: newMockEFSClient(t, nil)}
+
+	if err := e.SetFileSystemBackup(context.TODO(), "", ""); err == nil {
+		t.Error("expected error for empty input, got nil")
+	}
+
+	for _, bp := range []string{"ENABLED", "DISABLED"} {
+		for fs := range testFileSystemLifecycleConfigurations {
+			t.Logf("setting filesystem lifecycle config for %s", fs)
+
+			if err := e.SetFileSystemBackup(context.TODO(), fs, bp); err != nil {
+				t.Errorf("expected nil error, got %s", err)
+			}
+		}
+
+		if err := e.SetFileSystemBackup(context.TODO(), "fs-missing", bp); err == nil {
+			t.Error("expected error for missing filesystem, got nil")
+		}
+
+	}
+
+	e.Service.(*mockEFSClient).err = awserr.New(efs.ErrCodeBadRequest, "bad request", nil)
+	err := e.SetFileSystemBackup(context.TODO(), "fs-123", "ENABLED")
+	if aerr, ok := err.(apierror.Error); ok {
+		if aerr.Code != apierror.ErrBadRequest {
+			t.Errorf("expected error code %s, got: %s", apierror.ErrBadRequest, aerr.Code)
+		}
+	} else {
+
+		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
+	}
+
+	e.Service.(*mockEFSClient).err = awserr.New(efs.ErrCodeInternalServerError, "internal error", nil)
+	err = e.SetFileSystemBackup(context.TODO(), "fs-123", "ENABLED")
+	if aerr, ok := err.(apierror.Error); ok {
+		if aerr.Code != apierror.ErrServiceUnavailable {
+			t.Errorf("expected error code %s, got: %s", apierror.ErrServiceUnavailable, aerr.Code)
+		}
+	} else {
+		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
+	}
+
+	e.Service.(*mockEFSClient).err = awserr.New(efs.ErrCodeFileSystemNotFound, "not found", nil)
+	err = e.SetFileSystemBackup(context.TODO(), "fs-123", "ENABLED")
+	if aerr, ok := err.(apierror.Error); ok {
+		if aerr.Code != apierror.ErrNotFound {
+			t.Errorf("expected error code %s, got: %s", apierror.ErrNotFound, aerr.Code)
+		}
+	} else {
+		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
+	}
+
+	e.Service.(*mockEFSClient).err = awserr.New(efs.ErrCodeFileSystemInUse, "in use", nil)
+	err = e.SetFileSystemBackup(context.TODO(), "fs-123", "ENABLED")
+	if aerr, ok := err.(apierror.Error); ok {
+		if aerr.Code != apierror.ErrConflict {
+			t.Errorf("expected error code %s, got: %s", apierror.ErrConflict, aerr.Code)
+		}
+	} else {
+		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
+	}
+
+	// test non-aws error
+	e.Service.(*mockEFSClient).err = errors.New("things blowing up!")
+	err = e.SetFileSystemBackup(context.TODO(), "fs-123", "ENABLED")
 	if aerr, ok := err.(apierror.Error); ok {
 		if aerr.Code != apierror.ErrInternalError {
 			t.Errorf("expected error code %s, got: %s", apierror.ErrInternalError, aerr.Code)
