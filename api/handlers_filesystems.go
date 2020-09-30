@@ -77,7 +77,7 @@ func (s *server) FileSystemListHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(j)
 }
 
-// FilesystemShowHandler gets the details if a filesystem by id
+// FileSystemShowHandler gets the details if a filesystem by id
 func (s *server) FileSystemShowHandler(w http.ResponseWriter, r *http.Request) {
 	w = LogWriter{w}
 	vars := mux.Vars(r)
@@ -136,7 +136,7 @@ func (s *server) FileSystemShowHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(j)
 }
 
-// FilesystemDeleteHandler deletes a filesystem by id
+// FileSystemDeleteHandler deletes a filesystem by id
 func (s *server) FileSystemDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	w = LogWriter{w}
 	vars := mux.Vars(r)
@@ -152,6 +152,48 @@ func (s *server) FileSystemDeleteHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	task, err := s.filesystemDelete(r.Context(), account, group, fs)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+
+	w.Header().Set("X-Flywheel-Task", task.ID)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	w.Write([]byte("OK"))
+}
+
+// FileSystemUpdateHandler updates a filesystem by id
+func (s *server) FileSystemUpdateHandler(w http.ResponseWriter, r *http.Request) {
+	w = LogWriter{w}
+	vars := mux.Vars(r)
+	account := vars["account"]
+	group := vars["group"]
+	fs := vars["id"]
+
+	_, ok := s.efsServices[account]
+	if !ok {
+		log.Errorf("account not found: %s", account)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if exists, err := s.fileSystemExists(r.Context(), account, group, fs); err != nil {
+		handleError(w, err)
+	} else if !exists {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	req := FileSystemUpdateRequest{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		msg := fmt.Sprintf("cannot decode body into update filesystem input: %s", err)
+		handleError(w, apierror.New(apierror.ErrBadRequest, msg, err))
+		return
+	}
+
+	task, err := s.filesystemUpdate(r.Context(), account, group, fs, &req)
 	if err != nil {
 		handleError(w, err)
 		return

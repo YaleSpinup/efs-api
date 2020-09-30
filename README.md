@@ -15,6 +15,7 @@ GET    /v1/efs/{account}/filesystems
 GET    /v1/efs/{account}/filesystems/{group}
 POST   /v1/efs/{account}/filesystems/{group}
 GET    /v1/efs/{account}/filesystems/{group}/{id}
+PUT    /v1/efs/{account}/filesystems/{group}/{id}
 DELETE /v1/efs/{account}/filesystems/{group}/{id}
 ```
 
@@ -97,6 +98,38 @@ POST `/v1/efs/{account}/filesystems/{group}`
         {
             "Key": "Bill.Me",
             "Value": "Later"
+        }
+    ]
+}
+```
+
+### Update FileSystem
+
+The update endpoint allows for updating Tags, BackupPolicy and LifeCycleConfiguration for the filesystem.  All fields
+are optional.  Tags are additive (ie. existing tags are not removed), existing tags will be updated.
+
+Update requests are asynchronous and returns a task ID in the header `X-Flywheel-Task`.  This header can
+be used to get the task information and logs from the flywheel HTTP endpoint.
+
+PUT `/v1/efs/{account}/filesystems/{group}/{id}`
+
+| Response Code                 | Definition                      |
+| ----------------------------- | --------------------------------|
+| **200 OK**                    | create a filesystem             |
+| **400 Bad Request**           | badly formed request            |
+| **404 Not Found**             | account not found               |
+| **500 Internal Server Error** | a server error occurred         |
+
+#### Example update request body
+
+```json
+{
+    "LifeCycleConfiguration": "NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS",
+    "BackupPolicy": "ENABLED | DISABLED",
+    "Tags": [
+        {
+            "Key": "Bill.Me",
+            "Value": "Now"
         }
     ]
 }

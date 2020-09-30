@@ -60,13 +60,13 @@ func main() {
 
 	configFile, err := os.Open(*configFileName)
 	if err != nil {
-		log.Fatalln("Unable to open config file", err)
+		log.Fatalln("unable to open config file", err)
 	}
 
 	r := bufio.NewReader(configFile)
 	config, err := common.ReadConfig(r)
 	if err != nil {
-		log.Fatalf("Unable to read configuration from %s.  %+v", *configFileName, err)
+		log.Fatalf("unable to read configuration from %s.  %+v", *configFileName, err)
 	}
 
 	config.Version = common.Version{
@@ -89,10 +89,10 @@ func main() {
 	}
 
 	if config.LogLevel == "debug" {
-		log.Debug("Starting profiler on 127.0.0.1:6080")
+		log.Debug("starting profiler on 127.0.0.1:6080")
 		go http.ListenAndServe("127.0.0.1:6080", nil)
 	}
-	log.Debugf("Read config: %+v", config)
+	log.Debugf("read config: %+v", config)
 
 	if err := api.NewServer(config); err != nil {
 		log.Fatal(err)
@@ -100,6 +100,6 @@ func main() {
 }
 
 func vers() {
-	fmt.Printf("efs-api Version: %s%s\n", Version, VersionPrerelease)
+	fmt.Printf("efs-api version: %s%s\n", Version, VersionPrerelease)
 	os.Exit(0)
 }

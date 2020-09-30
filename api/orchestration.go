@@ -105,10 +105,13 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 			return
 		}
 
+		msgChan <- fmt.Sprintf("setting filesystem %s backup policy to %s", fsid, req.BackupPolicy)
+
 		if err := service.SetFileSystemBackup(fsCtx, fsid, req.BackupPolicy); err != nil {
 			errChan <- fmt.Errorf("failed to set backup policy for filesystem %s: %s", fsid, err.Error())
 			return
 		}
+		msgChan <- fmt.Sprintf("setting filesystem %s lifecycle configuration to %s", fsid, req.LifeCycleConfiguration)
 
 		if err := service.SetFileSystemLifecycle(fsCtx, fsid, req.LifeCycleConfiguration); err != nil {
 			errChan <- fmt.Errorf("failed to set lifecycle for filesystem %s: %s", fsid, err.Error())
@@ -167,6 +170,92 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 	}()
 
 	return fileSystemResponseFromEFS(filesystem, nil, nil, req.BackupPolicy, req.LifeCycleConfiguration), task, nil
+}
+
+func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string, req *FileSystemUpdateRequest) (*flywheel.Task, error) {
+	service, ok := s.efsServices[account]
+	if !ok {
+		return nil, apierror.New(apierror.ErrNotFound, "account doesnt exist", nil)
+	}
+
+	filesystem, err := service.GetFileSystem(ctx, fs)
+	if err != nil {
+		return nil, err
+	}
+
+	switch req.LifeCycleConfiguration {
+	case "":
+		log.Debugf("not updating lifecycle configuration")
+	case "NONE":
+		req.LifeCycleConfiguration = "NONE"
+	case "AFTER_7_DAYS",
+		"AFTER_14_DAYS",
+		"AFTER_30_DAYS",
+		"AFTER_60_DAYS",
+		"AFTER_90_DAYS":
+		log.Debugf("setting Tansition to Infrequent access to %s", req.LifeCycleConfiguration)
+	default:
+		return nil, apierror.New(apierror.ErrBadRequest, "invalid lifecycle configuration, valid values are NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS", nil)
+	}
+
+	switch req.BackupPolicy {
+	case "":
+		log.Debugf("not updatingbackup policy")
+	case "DISABLED", "ENABLED":
+		log.Debugf("setting backup policy to %s", req.BackupPolicy)
+	default:
+		return nil, apierror.New(apierror.ErrBadRequest, "invalid backup policy, valid values are ENABLED | DISABLED", nil)
+	}
+
+	if req.Tags != nil {
+		// normalize the tags passed in the request
+		req.Tags = s.normalizeTags(aws.StringValue(filesystem.Name), group, req.Tags)
+	}
+
+	// generate a new task to track and start it
+	task := flywheel.NewTask()
+
+	// start the orchestration
+	go func() {
+		fsid := aws.StringValue(filesystem.FileSystemId)
+
+		fsCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		msgChan, errChan := s.startTask(fsCtx, task)
+
+		msgChan <- fmt.Sprintf("requested update of filesystem %s", fsid)
+
+		if req.BackupPolicy != "" {
+			msgChan <- fmt.Sprintf("setting filesystem %s backup policy to %s", fsid, req.BackupPolicy)
+
+			if err := service.SetFileSystemBackup(fsCtx, fsid, req.BackupPolicy); err != nil {
+				errChan <- fmt.Errorf("failed to set backup policy for filesystem %s: %s", fsid, err.Error())
+				return
+			}
+		}
+
+		if req.LifeCycleConfiguration != "" {
+			msgChan <- fmt.Sprintf("setting filesystem %s lifecycle configuration to %s", fsid, req.LifeCycleConfiguration)
+
+			if err := service.SetFileSystemLifecycle(fsCtx, fsid, req.LifeCycleConfiguration); err != nil {
+				errChan <- fmt.Errorf("failed to set lifecycle for filesystem %s: %s", fsid, err.Error())
+				return
+			}
+		}
+
+		if req.Tags != nil {
+			msgChan <- fmt.Sprintf("updating tags for filesystem %s ", fsid)
+
+			if err := service.TagFilesystem(fsCtx, fsid, toEFSTags(req.Tags)); err != nil {
+				errChan <- fmt.Errorf("failed to set tags for filesystem %s: %s", fsid, err.Error())
+				return
+			}
+		}
+
+	}()
+
+	return task, nil
 }
 
 func (s *server) filesystemDelete(ctx context.Context, account, group, fs string) (*flywheel.Task, error) {

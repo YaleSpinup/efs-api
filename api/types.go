@@ -24,9 +24,6 @@ type apiVersion struct {
 	BuildStamp string `json:"buildstamp"`
 }
 
-// listFileSystemsResponse is the response for a list filesystems request
-type listFileSystemsResponse []string
-
 // FileSystemCreateRequest is the request input for creating a filesystem
 type FileSystemCreateRequest struct {
 	// Name of the filesystem
@@ -49,6 +46,23 @@ type FileSystemCreateRequest struct {
 	// Tags to apply to the filesystem
 	Tags []*Tag
 }
+
+// FileSystemUpdateRequest is the input for updating a filesystem
+type FileSystemUpdateRequest struct {
+	// BackupPolicy is the backup policy/status for the filesystem
+	// Valid values are ENABLED | DISABLED
+	BackupPolicy string
+
+	// After how long to transition to Infrequent Access storage
+	// Valid values: NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS
+	LifeCycleConfiguration string
+
+	// Tags to apply to the filesystem
+	Tags []*Tag
+}
+
+// listFileSystemsResponse is the response for a list filesystems request
+type listFileSystemsResponse []string
 
 // FileSystemResponse represents a full filesystem service response
 //

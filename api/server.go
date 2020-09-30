@@ -73,7 +73,7 @@ func NewServer(config common.Config) error {
 
 	// Create shared sessions
 	for name, c := range config.Accounts {
-		log.Infof("Creating new efs-api service for account '%s' with key '%s' in region '%s' (org: %s)", name, c.Akid, c.Region, s.org)
+		log.Infof("creating new efs-api service for account '%s' with key '%s' in region '%s' (org: %s)", name, c.Akid, c.Region, s.org)
 		s.efsServices[name] = efs.NewSession(c)
 		s.rgTaggingAPIServices[name] = resourcegroupstaggingapi.NewSession(c)
 	}
@@ -105,7 +105,7 @@ func NewServer(config common.Config) error {
 		ReadTimeout:  15 * time.Second,
 	}
 
-	log.Infof("Starting listener on %s", config.ListenAddress)
+	log.Infof("starting listener on %s", config.ListenAddress)
 	if err := srv.ListenAndServe(); err != nil {
 		return err
 	}
