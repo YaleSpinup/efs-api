@@ -204,3 +204,22 @@ func (e *EFS) GetFilesystemBackup(ctx context.Context, id string) (string, error
 
 	return "DISABLED", nil
 }
+
+func (e *EFS) TagFilesystem(ctx context.Context, id string, tags []*efs.Tag) error {
+	if id == "" || tags == nil {
+		return apierror.New(apierror.ErrBadRequest, "invalid input", nil)
+	}
+
+	log.Infof("tagging filesystem %s", id)
+
+	if _, err := e.Service.TagResourceWithContext(ctx, &efs.TagResourceInput{
+		ResourceId: aws.String(id),
+		Tags:       tags,
+	}); err != nil {
+		return ErrCode("failed to tag filesystem ", err)
+	}
+
+	log.Debugf("successfully applied tags to %s: %s", id, awsutil.Prettify(tags))
+
+	return nil
+}

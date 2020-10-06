@@ -36,4 +36,5 @@ func (s *server) routes() {
 	api.HandleFunc("/{account}/filesystems/{group}", s.FileSystemCreateHandler).Methods(http.MethodPost)
 	api.HandleFunc("/{account}/filesystems/{group}/{id}", s.FileSystemShowHandler).Methods(http.MethodGet)
 	api.HandleFunc("/{account}/filesystems/{group}/{id}", s.FileSystemDeleteHandler).Methods(http.MethodDelete)
+	api.HandleFunc("/{account}/filesystems/{group}/{id}", s.FileSystemUpdateHandler).Methods(http.MethodPut)
 }

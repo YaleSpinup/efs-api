@@ -1,11 +1,14 @@
 package efs
 
 import (
+	"context"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/YaleSpinup/efs-api/common"
+	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/service/efs"
 	"github.com/aws/aws-sdk-go/service/efs/efsiface"
 )
 
@@ -31,4 +34,12 @@ func TestNewSession(t *testing.T) {
 	if to != "efs.EFS" {
 		t.Errorf("expected type to be 'efs.EFS', got %s", to)
 	}
+}
+
+func (m *mockEFSClient) TagResourceWithContext(ctx context.Context, input *efs.TagResourceInput, opts ...request.Option) (*efs.TagResourceOutput, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+
+	return &efs.TagResourceOutput{}, nil
 }
