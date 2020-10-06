@@ -193,7 +193,7 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 		"AFTER_30_DAYS",
 		"AFTER_60_DAYS",
 		"AFTER_90_DAYS":
-		log.Debugf("setting Tansition to Infrequent access to %s", req.LifeCycleConfiguration)
+		log.Debugf("setting Transition to Infrequent access to %s", req.LifeCycleConfiguration)
 	default:
 		return nil, apierror.New(apierror.ErrBadRequest, "invalid lifecycle configuration, valid values are NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS", nil)
 	}
