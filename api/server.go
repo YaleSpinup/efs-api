@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/YaleSpinup/efs-api/common"
+	"github.com/YaleSpinup/efs-api/ec2"
 	"github.com/YaleSpinup/efs-api/efs"
 	"github.com/YaleSpinup/efs-api/resourcegroupstaggingapi"
 	"github.com/YaleSpinup/flywheel"
@@ -43,6 +44,7 @@ func init() {
 }
 
 type server struct {
+	ec2Services          map[string]ec2.EC2
 	efsServices          map[string]efs.EFS
 	rgTaggingAPIServices map[string]resourcegroupstaggingapi.ResourceGroupsTaggingAPI
 	flywheel             *flywheel.Manager
@@ -63,6 +65,7 @@ func NewServer(config common.Config) error {
 	}
 
 	s := server{
+		ec2Services:          make(map[string]ec2.EC2),
 		efsServices:          make(map[string]efs.EFS),
 		rgTaggingAPIServices: make(map[string]resourcegroupstaggingapi.ResourceGroupsTaggingAPI),
 		router:               mux.NewRouter(),
@@ -74,6 +77,7 @@ func NewServer(config common.Config) error {
 	// Create shared sessions
 	for name, c := range config.Accounts {
 		log.Infof("creating new efs-api service for account '%s' with key '%s' in region '%s' (org: %s)", name, c.Akid, c.Region, s.org)
+		s.ec2Services[name] = ec2.NewSession(c)
 		s.efsServices[name] = efs.NewSession(c)
 		s.rgTaggingAPIServices[name] = resourcegroupstaggingapi.NewSession(c)
 	}

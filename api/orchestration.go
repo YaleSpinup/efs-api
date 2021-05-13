@@ -50,13 +50,35 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 
 	// generate a new task to track and start it
 	task := flywheel.NewTask()
-	filesystem, err := service.CreateFileSystem(ctx, &efs.CreateFileSystemInput{
+	input := efs.CreateFileSystemInput{
 		CreationToken:   aws.String(task.ID),
 		Encrypted:       aws.Bool(true),
 		KmsKeyId:        aws.String(req.KmsKeyId),
 		PerformanceMode: aws.String("generalPurpose"),
 		Tags:            toEFSTags(req.Tags),
-	})
+	}
+
+	req.subnets = service.DefaultSubnets
+	if req.OneZone {
+		var err error
+		subnets, err := s.subnetAzs(ctx, account)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		var az, subnet string
+		// get a "random" az/subnet from the map
+		for subnet, az = range subnets {
+			break
+		}
+
+		log.Debugf("setting availability zone to %s", az)
+
+		input.AvailabilityZoneName = aws.String(az)
+		req.subnets = []string{subnet}
+	}
+
+	filesystem, err := service.CreateFileSystem(ctx, &input)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -121,7 +143,7 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 		// TODO rollback
 
 		mounttargets := []*efs.MountTargetDescription{}
-		for _, subnet := range service.DefaultSubnets {
+		for _, subnet := range req.subnets {
 			if req.Sgs == nil {
 				log.Debugf("setting default security groups on mount target")
 				req.Sgs = service.DefaultSgs
@@ -413,4 +435,39 @@ func (s *server) startTask(ctx context.Context, task *flywheel.Task) (chan<- str
 	}()
 
 	return msgChan, errChan
+}
+
+// subnetAzs returns a map of subnets to availability zone names used by EFS
+// this may change to support getting the list of subnets as well, currently it uses
+// the defaults from the EFS service
+func (s *server) subnetAzs(ctx context.Context, account string) (map[string]string, error) {
+	log.Infof("determining availability zone for account %s using efs onezone", account)
+
+	efsService, ok := s.efsServices[account]
+	if !ok {
+		return nil, apierror.New(apierror.ErrNotFound, "account doesnt exist", nil)
+	}
+
+	ec2Service, ok := s.ec2Services[account]
+	if !ok {
+		return nil, apierror.New(apierror.ErrNotFound, "account doesnt exist", nil)
+	}
+
+	subnets := make(map[string]string)
+	for _, s := range efsService.DefaultSubnets {
+		subnet, err := ec2Service.GetSubnet(ctx, s)
+		if err != nil {
+			return nil, err
+		}
+
+		log.Debugf("got details about subnet %s: %+v", s, subnet)
+
+		subnets[s] = aws.StringValue(subnet.AvailabilityZone)
+	}
+
+	if len(subnets) == 0 {
+		return nil, apierror.New(apierror.ErrBadRequest, "failed to determine usable availability zone", nil)
+	}
+
+	return subnets, nil
 }

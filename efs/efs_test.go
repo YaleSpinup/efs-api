@@ -14,7 +14,7 @@ import (
 
 var testTime = time.Now()
 
-// mockS3Client is a fake S3 client
+// mockEFSClient is a fake EFS client
 type mockEFSClient struct {
 	efsiface.EFSAPI
 	t   *testing.T

@@ -40,8 +40,14 @@ type FileSystemCreateRequest struct {
 	// Valid values: NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS
 	LifeCycleConfiguration string
 
+	// OneZone creates the filesystem using the EFS OneZone storage classes
+	OneZone bool
+
 	// Security Group IDs to apply to the mount targets
 	Sgs []string
+
+	// subnets holds the list of subnets for one zone, not exposed to the client
+	subnets []string
 
 	// Tags to apply to the filesystem
 	Tags []*Tag
@@ -70,6 +76,9 @@ type listFileSystemsResponse []string
 type FileSystemResponse struct {
 	// list of access points associated with the filesystem
 	AccessPoints []*AccessPoint
+
+	// availability zone the filesystem is using
+	AvailabilityZone string
 
 	// BackupPolicy is the backup policy/status for the filesystem
 	// Valid values are ENABLED | ENABLING | DISABLED | DISABLING
@@ -105,6 +114,9 @@ type FileSystemResponse struct {
 
 	// The current number of mount targets that the file system has.
 	NumberOfMountTargets int64
+
+	// If true, the filesystem is using the EFS OneZone storage classes
+	OneZone bool
 
 	// The latest known metered size (in bytes) of data stored in the file system,
 	// in its Value field, and the time at which that size was determined in its
@@ -215,6 +227,11 @@ func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTa
 		LifeCycleState:       aws.StringValue(fs.LifeCycleState),
 		Name:                 aws.StringValue(fs.Name),
 		NumberOfMountTargets: aws.Int64Value(fs.NumberOfMountTargets),
+	}
+
+	if fs.AvailabilityZoneName != nil {
+		filesystem.OneZone = true
+		filesystem.AvailabilityZone = aws.StringValue(fs.AvailabilityZoneName)
 	}
 
 	tags := make([]*Tag, 0, len(fs.Tags))
