@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// filesystemCreate orchestrates the creation of an EFS filesystem and all related mount targets, policies, etc.
 func (s *server) filesystemCreate(ctx context.Context, account, group string, req *FileSystemCreateRequest) (*FileSystemResponse, *flywheel.Task, error) {
 	service, ok := s.efsServices[account]
 	if !ok {
@@ -26,6 +27,7 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 		req.KmsKeyId = service.DefaultKmsKeyId
 	}
 
+	// validate lifecycle configuration setting
 	switch req.LifeCycleConfiguration {
 	case "", "NONE":
 		req.LifeCycleConfiguration = "NONE"
@@ -39,6 +41,7 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 		return nil, nil, apierror.New(apierror.ErrBadRequest, "invalid lifecycle configuration, valid values are NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS", nil)
 	}
 
+	// validate backup policy setting
 	switch req.BackupPolicy {
 	case "":
 		req.BackupPolicy = "DISABLED"
@@ -58,32 +61,36 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 		Tags:            toEFSTags(req.Tags),
 	}
 
-	req.subnets = service.DefaultSubnets
-	if req.OneZone {
-		var err error
-		subnets, err := s.subnetAzs(ctx, account)
-		if err != nil {
-			return nil, nil, err
+	// if subnets were not passed with the request, set them from the defaults
+	if req.Subnets == nil {
+		req.Subnets = service.DefaultSubnets
+		if req.OneZone {
+			var err error
+			subnets, err := s.subnetAzs(ctx, account)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			var az, subnet string
+			// get a "random" az/subnet from the map
+			for subnet, az = range subnets {
+				break
+			}
+
+			log.Debugf("setting availability zone to %s", az)
+
+			input.AvailabilityZoneName = aws.String(az)
+			req.Subnets = []string{subnet}
 		}
-
-		var az, subnet string
-		// get a "random" az/subnet from the map
-		for subnet, az = range subnets {
-			break
-		}
-
-		log.Debugf("setting availability zone to %s", az)
-
-		input.AvailabilityZoneName = aws.String(az)
-		req.subnets = []string{subnet}
 	}
 
+	// create the filessystem
 	filesystem, err := service.CreateFileSystem(ctx, &input)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// start the orchestration
+	// start the async orchestration to wait for filesystem to become available, set policies and create mount targets
 	go func() {
 		fsid := aws.StringValue(filesystem.FileSystemId)
 
@@ -143,7 +150,7 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 		// TODO rollback
 
 		mounttargets := []*efs.MountTargetDescription{}
-		for _, subnet := range req.subnets {
+		for _, subnet := range req.Subnets {
 			if req.Sgs == nil {
 				log.Debugf("setting default security groups on mount target")
 				req.Sgs = service.DefaultSgs
