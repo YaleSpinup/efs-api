@@ -47,7 +47,7 @@ type FileSystemCreateRequest struct {
 	Sgs []string
 
 	// subnets holds the list of subnets for one zone, not exposed to the client
-	subnets []string
+	Subnets []string
 
 	// Tags to apply to the filesystem
 	Tags []*Tag
