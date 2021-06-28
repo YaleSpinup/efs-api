@@ -64,24 +64,25 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 	// if subnets were not passed with the request, set them from the defaults
 	if req.Subnets == nil {
 		req.Subnets = service.DefaultSubnets
-		if req.OneZone {
-			var err error
-			subnets, err := s.subnetAzs(ctx, account)
-			if err != nil {
-				return nil, nil, err
-			}
+	}
 
-			var az, subnet string
-			// get a "random" az/subnet from the map
-			for subnet, az = range subnets {
-				break
-			}
-
-			log.Debugf("setting availability zone to %s", az)
-
-			input.AvailabilityZoneName = aws.String(az)
-			req.Subnets = []string{subnet}
+	if req.OneZone {
+		var err error
+		subnets, err := s.subnetAzs(ctx, account, req.Subnets)
+		if err != nil {
+			return nil, nil, err
 		}
+
+		// get a "random" az/subnet from the map
+		var az, subnet string
+		for subnet, az = range subnets {
+			break
+		}
+
+		log.Debugf("setting availability zone to %s", az)
+
+		input.AvailabilityZoneName = aws.String(az)
+		req.Subnets = []string{subnet}
 	}
 
 	// create the filessystem
@@ -447,13 +448,8 @@ func (s *server) startTask(ctx context.Context, task *flywheel.Task) (chan<- str
 // subnetAzs returns a map of subnets to availability zone names used by EFS
 // this may change to support getting the list of subnets as well, currently it uses
 // the defaults from the EFS service
-func (s *server) subnetAzs(ctx context.Context, account string) (map[string]string, error) {
-	log.Infof("determining availability zone for account %s using efs onezone", account)
-
-	efsService, ok := s.efsServices[account]
-	if !ok {
-		return nil, apierror.New(apierror.ErrNotFound, "account doesnt exist", nil)
-	}
+func (s *server) subnetAzs(ctx context.Context, account string, defSubnets []string) (map[string]string, error) {
+	log.Infof("determining availability zone for account %s and subnets %+v", account, defSubnets)
 
 	ec2Service, ok := s.ec2Services[account]
 	if !ok {
@@ -461,7 +457,7 @@ func (s *server) subnetAzs(ctx context.Context, account string) (map[string]stri
 	}
 
 	subnets := make(map[string]string)
-	for _, s := range efsService.DefaultSubnets {
+	for _, s := range defSubnets {
 		subnet, err := ec2Service.GetSubnet(ctx, s)
 		if err != nil {
 			return nil, err
