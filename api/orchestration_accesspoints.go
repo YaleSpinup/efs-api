@@ -9,6 +9,7 @@ import (
 	"github.com/YaleSpinup/flywheel"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/efs"
+	"github.com/google/uuid"
 )
 
 func (s server) accessPointCreate(ctx context.Context, account, group, fsid string, req *AccessPointCreateRequest) (*AccessPoint, *flywheel.Task, error) {
@@ -22,6 +23,25 @@ func (s server) accessPointCreate(ctx context.Context, account, group, fsid stri
 		return nil, nil, err
 	}
 
+	// if the Name is empty, just make one up
+	if req.Name == "" {
+		req.Name = uuid.NewString()
+	}
+
+	// using append here in case the filesystem as no tags
+	tags := []*efs.Tag{}
+	for _, t := range filesystem.Tags {
+		if aws.StringValue(t.Key) == "Name" {
+			name := fmt.Sprintf("%s-%s", aws.StringValue(filesystem.Name), req.Name)
+			tags = append(tags, &efs.Tag{
+				Key:   aws.String("Name"),
+				Value: aws.String(name),
+			})
+			continue
+		}
+		tags = append(tags, t)
+	}
+
 	// generate a new task to track and start it
 	task := flywheel.NewTask()
 	input := efs.CreateAccessPointInput{
@@ -29,7 +49,7 @@ func (s server) accessPointCreate(ctx context.Context, account, group, fsid stri
 		FileSystemId:  aws.String(fsid),
 		PosixUser:     req.PosixUser,
 		RootDirectory: req.RootDirectory,
-		Tags:          filesystem.Tags,
+		Tags:          tags,
 	}
 
 	out, err := service.CreateAccessPoint(ctx, &input)

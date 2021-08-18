@@ -2,6 +2,35 @@
 
 This API provides simple restful API access to EFS services.
 
+- [efs-api](#efs-api)
+  - [Endpoints](#endpoints)
+  - [Authentication](#authentication)
+  - [Usage](#usage)
+    - [Create a FileSystem](#create-a-filesystem)
+      - [Example create request body](#example-create-request-body)
+      - [Example create response body](#example-create-response-body)
+    - [Update FileSystem](#update-filesystem)
+      - [Example update request body](#example-update-request-body)
+    - [List FileSystems](#list-filesystems)
+      - [Example list response](#example-list-response)
+    - [List FileSystems by group id](#list-filesystems-by-group-id)
+      - [Example list by group response](#example-list-by-group-response)
+    - [Get details about a FileSystem, including it's mount targets and access points](#get-details-about-a-filesystem-including-its-mount-targets-and-access-points)
+      - [Example show response](#example-show-response)
+    - [Delete a FileSystem and all associated mount targets and access points](#delete-a-filesystem-and-all-associated-mount-targets-and-access-points)
+    - [Create an accesspoint for a filesystem](#create-an-accesspoint-for-a-filesystem)
+      - [Example create accesspoint request](#example-create-accesspoint-request)
+      - [Example create accesspoint response](#example-create-accesspoint-response)
+    - [List accesspoints for a filesystem](#list-accesspoints-for-a-filesystem)
+      - [Example list response](#example-list-response-1)
+    - [Get details about an accesspoint](#get-details-about-an-accesspoint)
+      - [Example get accesspoint response](#example-get-accesspoint-response)
+    - [Delete an accesspoint](#delete-an-accesspoint)
+      - [Example delete accesspoint response](#example-delete-accesspoint-response)
+    - [Get task information for asynchronous tasks](#get-task-information-for-asynchronous-tasks)
+      - [Example task response](#example-task-response)
+  - [License](#license)
+
 ## Endpoints
 
 ```
@@ -17,6 +46,11 @@ POST   /v1/efs/{account}/filesystems/{group}
 GET    /v1/efs/{account}/filesystems/{group}/{id}
 PUT    /v1/efs/{account}/filesystems/{group}/{id}
 DELETE /v1/efs/{account}/filesystems/{group}/{id}
+
+POST   /v1/efs/{account}/filesystems/{group}/{id}/ap
+GET    /v1/efs/{account}/filesystems/{group}/{id}/ap
+PUT    /v1/efs/{account}/filesystems/{group}/{id}/ap/{apid}
+DELETE /v1/efs/{account}/filesystems/{group}/{id}/ap/{apid}
 ```
 
 ## Authentication
@@ -267,6 +301,104 @@ DELETE `/v1/efs/{account}/filesystems/{group}/{id}`
 | **409 Conflict**              | filesystem is not in the available state |
 | **500 Internal Server Error** | a server error occurred                  |
 
+### Create an accesspoint for a filesystem
+
+Creating an accesspoint generates an accesspoint for a filesystem.  The
+
+POST `/v1/efs/{account}/filesystems/{group}/{id}/ap`
+
+#### Example create accesspoint request
+
+The request takes a posix user and a root directory.  Both are optional.  Setting the Posix User allows overriding the UID and
+GID of anyone mounting the accesspoint.  This is useful for cases where the filesystem is accessed by a non-root user such as
+in a container.  Setting the root directly will override the root directory of the filesystem when mounting via the accesspoint.
+
+[PosixUser](https://docs.aws.amazon.com/sdk-for-go/api/service/efs/#PosixUser)
+[RootDirectory](https://docs.aws.amazon.com/sdk-for-go/api/service/efs/#RootDirectory)]
+
+```json
+    "Name": "ap1",
+    "PosixUser": {
+        "Uid": 1000,
+        "Gid": 1000,
+    },
+    "RootDirectory": {
+        "Path": "/somedir",
+    }
+```
+
+#### Example create accesspoint response
+
+```json
+```
+
+| Response Code                 | Definition                      |
+| ----------------------------- | --------------------------------|
+| **200 OK**                    | create an access point          |
+| **400 Bad Request**           | badly formed request            |
+| **404 Not Found**             | account not found               |
+| **500 Internal Server Error** | a server error occurred         |
+
+### List accesspoints for a filesystem
+
+GET `/v1/efs/{account}/filesystems/{group}/{id}/ap`
+
+#### Example list response
+
+```json
+[
+    "fsap-9876543",
+    "fsap-abcdefg"
+]
+```
+
+| Response Code                 | Definition                      |
+| ----------------------------- | --------------------------------|
+| **200 OK**                    | return the list of accesspoints |
+| **400 Bad Request**           | badly formed request            |
+| **404 Not Found**             | account not found               |
+| **500 Internal Server Error** | a server error occurred         |
+
+### Get details about an accesspoint
+
+GET `/v1/efs/{account}/filesystems/{group}/{id}/ap/{apid}`
+
+#### Example get accesspoint response
+
+```json
+{
+    "AccessPointArn": "arn:aws:elasticfilesystem:us-east-1:516855177326:access-point/fsap-0e84a50717caf79a6",
+    "AccessPointId": "fsap-0e84a50717caf79a6",
+    "LifeCycleState": "creating",
+    "Name": "myAwesomeFilesystem12-ap1",
+    "PosixUser": {
+        "Gid": 1000,
+        "SecondaryGids": null,
+        "Uid": 1000
+    },
+    "RootDirectory": {
+        "CreationInfo": null,
+        "Path": "/somedir"
+    }
+}
+```
+
+| Response Code                 | Definition                        |
+| ----------------------------- | ----------------------------------|
+| **200 OK**                    | return details of an accesspoint  |
+| **400 Bad Request**           | badly formed request              |
+| **404 Not Found**             | account, fs, or ap not found      |
+| **500 Internal Server Error** | a server error occurred           |
+
+### Delete an accesspoint
+
+DELETE `/v1/efs/{account}/filesystems/{group}/{id}/ap/{apid}`
+
+#### Example delete accesspoint response
+
+```json
+OK
+```
 
 ### Get task information for asynchronous tasks
 

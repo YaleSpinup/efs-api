@@ -424,6 +424,7 @@ func (s *server) fileSystemExists(ctx context.Context, account, group, fs string
 
 // AccessPointCreateRequest is the input for creating an access point
 type AccessPointCreateRequest struct {
+	Name string
 	// https://docs.aws.amazon.com/sdk-for-go/api/service/efs/#PosixUser
 	PosixUser *efs.PosixUser
 	// https://docs.aws.amazon.com/sdk-for-go/api/service/efs/#CreationInfo
