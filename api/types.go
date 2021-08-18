@@ -199,15 +199,12 @@ type AccessPoint struct {
 	// The full POSIX identity, including the user ID, group ID, and secondary group
 	// IDs on the access point that is used for all file operations by NFS clients
 	// using the access point.
-	PosixUser *PosixUser
+	PosixUser *efs.PosixUser
 
 	// The directory on the Amazon EFS file system that the access point exposes
 	// as the root directory to NFS clients using the access point.
-	RootDirectory *RootDirectory
+	RootDirectory *efs.RootDirectory
 }
-
-type PosixUser struct{}
-type RootDirectory struct{}
 
 type Tag struct {
 	Key   string
@@ -252,8 +249,8 @@ func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTa
 			AccessPointId:  aws.StringValue(a.AccessPointId),
 			LifeCycleState: aws.StringValue(a.LifeCycleState),
 			Name:           aws.StringValue(a.Name),
-			PosixUser:      &PosixUser{},
-			RootDirectory:  &RootDirectory{},
+			PosixUser:      a.PosixUser,
+			RootDirectory:  a.RootDirectory,
 		})
 	}
 	filesystem.AccessPoints = accessPoints
@@ -423,4 +420,23 @@ func (s *server) fileSystemExists(ctx context.Context, account, group, fs string
 	}
 
 	return false, nil
+}
+
+// AccessPointCreateRequest is the input for creating an access point
+type AccessPointCreateRequest struct {
+	// https://docs.aws.amazon.com/sdk-for-go/api/service/efs/#PosixUser
+	PosixUser *efs.PosixUser
+	// https://docs.aws.amazon.com/sdk-for-go/api/service/efs/#CreationInfo
+	RootDirectory *efs.RootDirectory
+}
+
+func accessPointResponseFromEFS(ap *efs.AccessPointDescription) *AccessPoint {
+	return &AccessPoint{
+		AccessPointArn: aws.StringValue(ap.AccessPointArn),
+		AccessPointId:  aws.StringValue(ap.AccessPointId),
+		LifeCycleState: aws.StringValue(ap.LifeCycleState),
+		Name:           aws.StringValue(ap.Name),
+		PosixUser:      ap.PosixUser,
+		RootDirectory:  ap.RootDirectory,
+	}
 }
