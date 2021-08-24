@@ -47,10 +47,10 @@ GET    /v1/efs/{account}/filesystems/{group}/{id}
 PUT    /v1/efs/{account}/filesystems/{group}/{id}
 DELETE /v1/efs/{account}/filesystems/{group}/{id}
 
-POST   /v1/efs/{account}/filesystems/{group}/{id}/ap
-GET    /v1/efs/{account}/filesystems/{group}/{id}/ap
-PUT    /v1/efs/{account}/filesystems/{group}/{id}/ap/{apid}
-DELETE /v1/efs/{account}/filesystems/{group}/{id}/ap/{apid}
+POST   /v1/efs/{account}/filesystems/{group}/{id}/aps
+GET    /v1/efs/{account}/filesystems/{group}/{id}/aps
+PUT    /v1/efs/{account}/filesystems/{group}/{id}/aps/{apid}
+DELETE /v1/efs/{account}/filesystems/{group}/{id}/aps/{apid}
 ```
 
 ## Authentication
@@ -305,7 +305,7 @@ DELETE `/v1/efs/{account}/filesystems/{group}/{id}`
 
 Creating an accesspoint generates an accesspoint for a filesystem.  The
 
-POST `/v1/efs/{account}/filesystems/{group}/{id}/ap`
+POST `/v1/efs/{account}/filesystems/{group}/{id}/aps`
 
 #### Example create accesspoint request
 
@@ -341,7 +341,7 @@ in a container.  Setting the root directly will override the root directory of t
 
 ### List accesspoints for a filesystem
 
-GET `/v1/efs/{account}/filesystems/{group}/{id}/ap`
+GET `/v1/efs/{account}/filesystems/{group}/{id}/aps`
 
 #### Example list response
 
@@ -361,13 +361,13 @@ GET `/v1/efs/{account}/filesystems/{group}/{id}/ap`
 
 ### Get details about an accesspoint
 
-GET `/v1/efs/{account}/filesystems/{group}/{id}/ap/{apid}`
+GET `/v1/efs/{account}/filesystems/{group}/{id}/aps/{apid}`
 
 #### Example get accesspoint response
 
 ```json
 {
-    "AccessPointArn": "arn:aws:elasticfilesystem:us-east-1:516855177326:access-point/fsap-0e84a50717caf79a6",
+    "AccessPointArn": "arn:aws:elasticfilesystem:us-east-1:012345678910:access-point/fsap-0e84a50717caf79a6",
     "AccessPointId": "fsap-0e84a50717caf79a6",
     "LifeCycleState": "creating",
     "Name": "myAwesomeFilesystem12-ap1",
@@ -392,7 +392,7 @@ GET `/v1/efs/{account}/filesystems/{group}/{id}/ap/{apid}`
 
 ### Delete an accesspoint
 
-DELETE `/v1/efs/{account}/filesystems/{group}/{id}/ap/{apid}`
+DELETE `/v1/efs/{account}/filesystems/{group}/{id}/aps/{apid}`
 
 #### Example delete accesspoint response
 

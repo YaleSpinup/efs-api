@@ -38,8 +38,8 @@ func (s *server) routes() {
 	api.HandleFunc("/{account}/filesystems/{group}/{id}", s.FileSystemDeleteHandler).Methods(http.MethodDelete)
 	api.HandleFunc("/{account}/filesystems/{group}/{id}", s.FileSystemUpdateHandler).Methods(http.MethodPut)
 
-	api.HandleFunc("/{account}/filesystems/{group}/{id}/ap", s.FileSystemAPListHandler).Methods(http.MethodGet)
-	api.HandleFunc("/{account}/filesystems/{group}/{id}/ap", s.FileSystemAPCreateHandler).Methods(http.MethodPost)
-	api.HandleFunc("/{account}/filesystems/{group}/{id}/ap/{apid}", s.FileSystemAPShowHandler).Methods(http.MethodGet)
-	api.HandleFunc("/{account}/filesystems/{group}/{id}/ap/{apid}", s.FileSystemAPDeleteHandler).Methods(http.MethodDelete)
+	api.HandleFunc("/{account}/filesystems/{group}/{id}/aps", s.FileSystemAPListHandler).Methods(http.MethodGet)
+	api.HandleFunc("/{account}/filesystems/{group}/{id}/aps", s.FileSystemAPCreateHandler).Methods(http.MethodPost)
+	api.HandleFunc("/{account}/filesystems/{group}/{id}/aps/{apid}", s.FileSystemAPShowHandler).Methods(http.MethodGet)
+	api.HandleFunc("/{account}/filesystems/{group}/{id}/aps/{apid}", s.FileSystemAPDeleteHandler).Methods(http.MethodDelete)
 }

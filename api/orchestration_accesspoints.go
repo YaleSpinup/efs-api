@@ -69,7 +69,7 @@ func (s server) accessPointCreate(ctx context.Context, account, group, fsid stri
 
 		msgChan <- fmt.Sprintf("requested creation of accesspoint for filesystem %s", fsid)
 
-		// wait for the filesystem to become available
+		// wait for the accesspoint to become available
 		if err = retry(10, 2*time.Second, func() error {
 			msg := fmt.Sprintf("checking if accesspoint %s is available before continuing", apid)
 			msgChan <- msg
