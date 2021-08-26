@@ -29,6 +29,9 @@ type FileSystemCreateRequest struct {
 	// Name of the filesystem
 	Name string
 
+	// AccessPoints is an optional list of access points to create
+	AccessPoints []*AccessPointCreateRequest
+
 	// BackupPolicy is the backup policy/status for the filesystem
 	// Valid values are ENABLED | DISABLED
 	BackupPolicy string
@@ -367,12 +370,17 @@ func (s *server) listFileSystems(ctx context.Context, account, group string) ([]
 		return nil, err
 	}
 
-	fsList := make([]string, 0, len(out))
+	fsList := []string{}
 	for _, fs := range out {
 		a, err := arn.Parse(aws.StringValue(fs.ResourceARN))
 		if err != nil {
 			log.Errorf("failed to parse ARN %s: %s", fs, err)
 			fsList = append(fsList, aws.StringValue(fs.ResourceARN))
+		}
+
+		// skip any efs resources that is not a file-system (ie. access-point)
+		if !strings.HasPrefix(a.Resource, "file-system/") {
+			continue
 		}
 
 		fsid := strings.TrimPrefix(a.Resource, "file-system/")

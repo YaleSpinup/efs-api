@@ -135,20 +135,25 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 			return
 		}
 
+		rollBackTasks = append(rollBackTasks, func(ctx context.Context) error {
+			log.Errorf("rollback: deleting filesystem: %s", fsid)
+			return service.DeleteFileSystem(fsCtx, fsid)
+		})
+
 		msgChan <- fmt.Sprintf("setting filesystem %s backup policy to %s", fsid, req.BackupPolicy)
 
-		if err := service.SetFileSystemBackup(fsCtx, fsid, req.BackupPolicy); err != nil {
+		err = service.SetFileSystemBackup(fsCtx, fsid, req.BackupPolicy)
+		if err != nil {
 			errChan <- fmt.Errorf("failed to set backup policy for filesystem %s: %s", fsid, err.Error())
 			return
 		}
 		msgChan <- fmt.Sprintf("setting filesystem %s lifecycle configuration to %s", fsid, req.LifeCycleConfiguration)
 
-		if err := service.SetFileSystemLifecycle(fsCtx, fsid, req.LifeCycleConfiguration); err != nil {
+		err = service.SetFileSystemLifecycle(fsCtx, fsid, req.LifeCycleConfiguration)
+		if err != nil {
 			errChan <- fmt.Errorf("failed to set lifecycle for filesystem %s: %s", fsid, err.Error())
 			return
 		}
-
-		// TODO rollback
 
 		mounttargets := []*efs.MountTargetDescription{}
 		for _, subnet := range req.Subnets {
@@ -157,7 +162,8 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 				req.Sgs = service.DefaultSgs
 			}
 
-			mt, err := service.CreateMountTarget(fsCtx, &efs.CreateMountTargetInput{
+			var mt *efs.MountTargetDescription
+			mt, err = service.CreateMountTarget(fsCtx, &efs.CreateMountTargetInput{
 				FileSystemId:   aws.String(fsid),
 				SecurityGroups: aws.StringSlice(req.Sgs),
 				SubnetId:       aws.String(subnet),
@@ -170,7 +176,6 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 
 			mounttargets = append(mounttargets, mt)
 
-			// TODO rollback
 			// TODO tag mount target eni?
 		}
 
@@ -197,6 +202,67 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 		}
 
 		msgChan <- fmt.Sprintf("created %d mount targets for fs %s", len(mounttargets), fsid)
+
+		rollBackTasks = append(rollBackTasks, func(ctx context.Context) error {
+			log.Errorf("rollback: deleting mount target for filesystem %s", fsid)
+
+			for _, mt := range mounttargets {
+				if err := service.DeleteMountTarget(fsCtx, aws.StringValue(mt.MountTargetId)); err != nil {
+					return err
+				}
+			}
+
+			if err = retry(10, 2*time.Second, func() error {
+				log.Warnf("rollback: waiting for number of mount targets for filesystem %s to be 0", fsid)
+
+				out, err := service.GetFileSystem(fsCtx, fsid)
+				if err != nil {
+					log.Warnf("rollback: error getting filesystem %s during delete: %s", fsid, err)
+					return err
+				}
+
+				if num := aws.Int64Value(out.NumberOfMountTargets); num > 0 {
+					log.Warnf("number of mount targets for filesystem %s > 0 (current: %d)", fsid, num)
+					return fmt.Errorf("waiting for number of mount targets for filesystem %s to be 0 (current: %d)", fsid, num)
+				}
+
+				return nil
+			}); err != nil {
+				return err
+			}
+
+			return nil
+		})
+
+		for _, apReq := range req.AccessPoints {
+			msgChan <- fmt.Sprintf("creating access point '%s' for fs %s", apReq.Name, fsid)
+
+			var ap *AccessPoint
+			var apTask *flywheel.Task
+			ap, apTask, err = s.accessPointCreate(fsCtx, account, group, fsid, apReq)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			if err = retry(10, 2*time.Second, func() error {
+				msgChan <- fmt.Sprintf("waiting for access point %s for filesystem %s to be available", ap.AccessPointId, fsid)
+
+				switch apTask.Status {
+				case flywheel.STATUS_COMPLETED:
+					return nil
+				case flywheel.STATUS_FAILED:
+					return fmt.Errorf("failed to create access point %s for fs %s: %s", ap.AccessPointId, fsid, apTask.Failure)
+				}
+
+				msgChan <- fmt.Sprintf("access point %s for filesystem %s is not yet available (%s)", ap.AccessPointId, fsid, apTask.Status)
+				return fmt.Errorf("filsystem %s not yet available", fsid)
+			}); err != nil {
+				errChan <- err
+				return
+			}
+		}
+
 	}()
 
 	return fileSystemResponseFromEFS(filesystem, nil, nil, req.BackupPolicy, req.LifeCycleConfiguration), task, nil
@@ -319,6 +385,18 @@ func (s *server) filesystemDelete(ctx context.Context, account, group, fs string
 		if status := aws.StringValue(mt.LifeCycleState); status != "available" {
 			msg := fmt.Sprintf("filesystem %s mount target %s has status %s, cannot delete", fs, aws.StringValue(mt.MountTargetId), status)
 			return nil, apierror.New(apierror.ErrConflict, msg, nil)
+		}
+	}
+
+	accesspoints, err := service.ListAccessPoints(ctx, fs)
+	if err != nil {
+		return nil, err
+	}
+
+	// if there are any accesspoints defined for the filesystem, delete them
+	for _, ap := range accesspoints {
+		if err := service.DeleteAccessPoint(ctx, aws.StringValue(ap.AccessPointId)); err != nil {
+			return nil, err
 		}
 	}
 

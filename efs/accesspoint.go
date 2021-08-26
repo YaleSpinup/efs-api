@@ -63,6 +63,8 @@ func (e EFS) GetAccessPoint(ctx context.Context, apid string) (*efs.AccessPointD
 		return nil, apierror.New(apierror.ErrBadRequest, "invalid input", nil)
 	}
 
+	log.Infof("getting access point %s", apid)
+
 	out, err := e.Service.DescribeAccessPointsWithContext(ctx, &efs.DescribeAccessPointsInput{
 		AccessPointId: aws.String(apid),
 	})
@@ -83,6 +85,8 @@ func (e EFS) DeleteAccessPoint(ctx context.Context, apid string) error {
 	if apid == "" {
 		return apierror.New(apierror.ErrBadRequest, "invalid input", nil)
 	}
+
+	log.Infof("deleting access point %s", apid)
 
 	if _, err := e.Service.DeleteAccessPointWithContext(ctx, &efs.DeleteAccessPointInput{
 		AccessPointId: aws.String(apid),
