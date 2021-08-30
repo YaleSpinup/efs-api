@@ -248,7 +248,16 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 			if err = retry(10, 2*time.Second, func() error {
 				msgChan <- fmt.Sprintf("waiting for access point %s for filesystem %s to be available", ap.AccessPointId, fsid)
 
-				switch apTask.Status {
+				apt, err := s.flywheel.GetTask(fsCtx, apTask.ID)
+				if err != nil {
+					return err
+				}
+
+				if apt == nil {
+					return fmt.Errorf("filsystem %s not found", fsid)
+				}
+
+				switch apt.Status {
 				case flywheel.STATUS_COMPLETED:
 					return nil
 				case flywheel.STATUS_FAILED:
