@@ -221,6 +221,7 @@ func retry(attempts int, sleep time.Duration, f func() error) error {
 			jitter := time.Duration(rand.Int63n(int64(sleep)))
 			sleep = sleep + jitter/2
 
+			log.Debugf("sleeping for %s", sleep.String())
 			time.Sleep(sleep)
 			return retry(attempts, 2*sleep, f)
 		}
