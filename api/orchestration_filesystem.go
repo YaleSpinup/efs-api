@@ -41,6 +41,16 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 		return nil, nil, apierror.New(apierror.ErrBadRequest, "invalid lifecycle configuration, valid values are NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS", nil)
 	}
 
+	// validate intelligent tiering configuration setting
+	switch req.TransitionToPrimaryStorageClass {
+	case "", "NONE":
+		req.TransitionToPrimaryStorageClass = "NONE"
+	case "AFTER_1_ACCESS":
+		log.Debugf("setting Tansition to primary access to %s", req.TransitionToPrimaryStorageClass)
+	default:
+		return nil, nil, apierror.New(apierror.ErrBadRequest, "invalid transition to primary storage class rule, valid values are NONE | AFTER_1_ACCESS", nil)
+	}
+
 	// validate backup policy setting
 	switch req.BackupPolicy {
 	case "":
@@ -149,7 +159,7 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 		}
 		msgChan <- fmt.Sprintf("setting filesystem %s lifecycle configuration to %s", fsid, req.LifeCycleConfiguration)
 
-		err = service.SetFileSystemLifecycle(fsCtx, fsid, req.LifeCycleConfiguration)
+		err = service.SetFileSystemLifecycle(fsCtx, fsid, req.LifeCycleConfiguration, req.TransitionToPrimaryStorageClass)
 		if err != nil {
 			errChan <- fmt.Errorf("failed to set lifecycle for filesystem %s: %s", fsid, err.Error())
 			return
@@ -274,7 +284,7 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 
 	}()
 
-	return fileSystemResponseFromEFS(filesystem, nil, nil, req.BackupPolicy, req.LifeCycleConfiguration), task, nil
+	return fileSystemResponseFromEFS(filesystem, nil, nil, req.BackupPolicy, req.LifeCycleConfiguration, req.TransitionToPrimaryStorageClass), task, nil
 }
 
 func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string, req *FileSystemUpdateRequest) (*flywheel.Task, error) {
@@ -288,19 +298,42 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 		return nil, err
 	}
 
-	switch req.LifeCycleConfiguration {
-	case "":
-		log.Debugf("not updating lifecycle configuration")
-	case "NONE":
-		req.LifeCycleConfiguration = "NONE"
-	case "AFTER_7_DAYS",
-		"AFTER_14_DAYS",
-		"AFTER_30_DAYS",
-		"AFTER_60_DAYS",
-		"AFTER_90_DAYS":
-		log.Debugf("setting Transition to Infrequent access to %s", req.LifeCycleConfiguration)
-	default:
-		return nil, apierror.New(apierror.ErrBadRequest, "invalid lifecycle configuration, valid values are NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS", nil)
+	// if the lifecycle configuraiton or transition to primary storage rule is updated
+	if req.LifeCycleConfiguration != "" || req.TransitionToPrimaryStorageClass != "" {
+		transitionToIA, transitionToPrimary, err := service.GetFilesystemLifecycle(ctx, fs)
+		if err != nil {
+			return nil, err
+		}
+
+		switch req.LifeCycleConfiguration {
+		case "":
+			log.Debugf("not updating lifecycle configuration")
+			req.LifeCycleConfiguration = transitionToIA
+		case "NONE":
+			req.LifeCycleConfiguration = "NONE"
+		case "AFTER_7_DAYS",
+			"AFTER_14_DAYS",
+			"AFTER_30_DAYS",
+			"AFTER_60_DAYS",
+			"AFTER_90_DAYS":
+			log.Debugf("setting Transition to Infrequent access to %s", req.LifeCycleConfiguration)
+		default:
+			return nil, apierror.New(apierror.ErrBadRequest, "invalid lifecycle configuration, valid values are NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS", nil)
+		}
+
+		// validate intelligent tiering configuration setting
+		switch req.TransitionToPrimaryStorageClass {
+		case "":
+			log.Debugf("not updating intelligent tiering rule")
+			req.TransitionToPrimaryStorageClass = transitionToPrimary
+		case "NONE":
+			req.TransitionToPrimaryStorageClass = "NONE"
+		case "AFTER_1_ACCESS":
+			log.Debugf("setting Tansition to primary access to %s", req.TransitionToPrimaryStorageClass)
+		default:
+			return nil, apierror.New(apierror.ErrBadRequest, "invalid transition to primary storage class rule, valid values are NONE | AFTER_1_ACCESS", nil)
+		}
+
 	}
 
 	switch req.BackupPolicy {
@@ -340,10 +373,10 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 			}
 		}
 
-		if req.LifeCycleConfiguration != "" {
+		if req.LifeCycleConfiguration != "" || req.TransitionToPrimaryStorageClass != "" {
 			msgChan <- fmt.Sprintf("setting filesystem %s lifecycle configuration to %s", fsid, req.LifeCycleConfiguration)
 
-			if err := service.SetFileSystemLifecycle(fsCtx, fsid, req.LifeCycleConfiguration); err != nil {
+			if err := service.SetFileSystemLifecycle(fsCtx, fsid, req.LifeCycleConfiguration, req.TransitionToPrimaryStorageClass); err != nil {
 				errChan <- fmt.Errorf("failed to set lifecycle for filesystem %s: %s", fsid, err.Error())
 				return
 			}

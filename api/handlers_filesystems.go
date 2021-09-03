@@ -117,7 +117,7 @@ func (s *server) FileSystemShowHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lifecycle, err := efsService.GetFilesystemLifecycle(r.Context(), aws.StringValue(filesystem.FileSystemId))
+	transitionToIA, transitionToPrimary, err := efsService.GetFilesystemLifecycle(r.Context(), aws.StringValue(filesystem.FileSystemId))
 	if err != nil {
 		handleError(w, err)
 		return
@@ -129,7 +129,7 @@ func (s *server) FileSystemShowHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	output := fileSystemResponseFromEFS(filesystem, mounttargets, accessPoints, backup, lifecycle)
+	output := fileSystemResponseFromEFS(filesystem, mounttargets, accessPoints, backup, transitionToIA, transitionToPrimary)
 	j, err := json.Marshal(output)
 	if err != nil {
 		log.Errorf("cannot marshal response (%v) into JSON: %s", output, err)
