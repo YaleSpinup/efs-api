@@ -103,21 +103,21 @@ func (e *EFS) GetFileSystem(ctx context.Context, id string) (*efs.FileSystemDesc
 }
 
 // SetFileSystemLifecycle sets a lifecycle transition policy on a filesystem
-func (e *EFS) SetFileSystemLifecycle(ctx context.Context, id, config string) error {
+func (e *EFS) SetFileSystemLifecycle(ctx context.Context, id, transitionToIA, transitionToPrimary string) error {
 	if id == "" {
 		return apierror.New(apierror.ErrBadRequest, "invalid input", nil)
 	}
 
-	log.Infof("setting filesystem lifecycle for %s to %s", id, config)
+	log.Infof("setting filesystem lifecycle for %s to %s/%s", id, transitionToIA, transitionToPrimary)
 
 	lifecycle := []*efs.LifecyclePolicy{}
-	if config != "" && config != "NONE" {
-		log.Debugf("setting lifecycle policy to %s", config)
-		lifecycle = []*efs.LifecyclePolicy{
-			{
-				TransitionToIA: aws.String(config),
-			},
-		}
+	if transitionToIA != "" && transitionToIA != "NONE" {
+		log.Debugf("setting lifecycle policy to %s", transitionToIA)
+		lifecycle = append(lifecycle, &efs.LifecyclePolicy{TransitionToIA: aws.String(transitionToIA)})
+	}
+
+	if transitionToPrimary != "" && transitionToPrimary != "NONE" {
+		lifecycle = append(lifecycle, &efs.LifecyclePolicy{TransitionToPrimaryStorageClass: aws.String(transitionToPrimary)})
 	}
 
 	out, err := e.Service.PutLifecycleConfigurationWithContext(ctx, &efs.PutLifecycleConfigurationInput{
@@ -128,15 +128,15 @@ func (e *EFS) SetFileSystemLifecycle(ctx context.Context, id, config string) err
 		return ErrCode("failed to set filesystem lifecycle", err)
 	}
 
-	log.Debugf("got output when setting %s lifecycle to %s: %s", id, config, awsutil.Prettify(out))
+	log.Debugf("got output when setting %s lifecycle to %s/%s: %s", id, transitionToIA, transitionToPrimary, awsutil.Prettify(out))
 
 	return nil
 }
 
 // GetFilesystemLifecycle gets the lifecycle transition configuration for a filesystem
-func (e *EFS) GetFilesystemLifecycle(ctx context.Context, id string) (string, error) {
+func (e *EFS) GetFilesystemLifecycle(ctx context.Context, id string) (string, string, error) {
 	if id == "" {
-		return "", apierror.New(apierror.ErrBadRequest, "invalid input", nil)
+		return "", "", apierror.New(apierror.ErrBadRequest, "invalid input", nil)
 	}
 
 	log.Infof("getting filesystem lifecycle configuration for efs filesystem %s", id)
@@ -145,17 +145,26 @@ func (e *EFS) GetFilesystemLifecycle(ctx context.Context, id string) (string, er
 		FileSystemId: aws.String(id),
 	})
 	if err != nil {
-		return "", ErrCode("failed to get filesystem lifecycle configuration", err)
+		return "", "", ErrCode("failed to get filesystem lifecycle configuration", err)
 	}
 
-	lifecycle := "NONE"
-	if output.LifecyclePolicies != nil && len(output.LifecyclePolicies) > 0 && output.LifecyclePolicies[0].TransitionToIA != nil {
-		lifecycle = aws.StringValue(output.LifecyclePolicies[0].TransitionToIA)
+	log.Debugf("got filesystemy lifecycle configuration for %s: %+v", id, output)
+
+	transitionToIA := "NONE"
+	transitionToPrimary := "NONE"
+	if output.LifecyclePolicies != nil {
+		for _, p := range output.LifecyclePolicies {
+			if p.TransitionToIA != nil {
+				transitionToIA = aws.StringValue(p.TransitionToIA)
+			}
+
+			if p.TransitionToPrimaryStorageClass != nil {
+				transitionToPrimary = aws.StringValue(p.TransitionToPrimaryStorageClass)
+			}
+		}
 	}
 
-	log.Debugf("got filesystem lifecycle configuration for %s: %+v", id, lifecycle)
-
-	return lifecycle, nil
+	return transitionToIA, transitionToPrimary, nil
 }
 
 // SetFileSystemBackup sets a lifecycle transition policy on a filesystem

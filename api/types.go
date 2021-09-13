@@ -43,6 +43,10 @@ type FileSystemCreateRequest struct {
 	// Valid values: NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS
 	LifeCycleConfiguration string
 
+	// Rule for transitioning back to the primary storage class from IA
+	// Valid values: NONE | AFTER_1_ACCESS
+	TransitionToPrimaryStorageClass string
+
 	// OneZone creates the filesystem using the EFS OneZone storage classes
 	OneZone bool
 
@@ -65,6 +69,10 @@ type FileSystemUpdateRequest struct {
 	// After how long to transition to Infrequent Access storage
 	// Valid values: NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS
 	LifeCycleConfiguration string
+
+	// Rule for transitioning back to the primary storage class from IA
+	// Valid values: NONE | AFTER_1_ACCESS
+	TransitionToPrimaryStorageClass string
 
 	// Tags to apply to the filesystem
 	Tags []*Tag
@@ -105,6 +113,10 @@ type FileSystemResponse struct {
 	// The lifecycle transition policy.
 	// Valid values: NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS
 	LifeCycleConfiguration string
+
+	// Rule for transitioning back to the primary storage class from IA
+	// Valid values: NONE | AFTER_1_ACCESS
+	TransitionToPrimaryStorageClass string
 
 	// A list of mount targets associated with the filesystem.
 	MountTargets []*MountTarget
@@ -215,7 +227,7 @@ type Tag struct {
 }
 
 // fileSystemFromEFS maps an EFS filesystem, list of moutn targets, and list of access points to a common struct
-func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTargetDescription, aps []*efs.AccessPointDescription, backup, lifecycle string) *FileSystemResponse {
+func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTargetDescription, aps []*efs.AccessPointDescription, backup, ia, primary string) *FileSystemResponse {
 	log.Debugf("mapping filesystem %s", awsutil.Prettify(fs))
 
 	filesystem := FileSystemResponse{
@@ -281,9 +293,14 @@ func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTa
 		}
 	}
 
-	filesystem.LifeCycleConfiguration = lifecycle
+	filesystem.LifeCycleConfiguration = ia
 	if filesystem.LifeCycleConfiguration == "" {
 		filesystem.LifeCycleConfiguration = "NONE"
+	}
+
+	filesystem.TransitionToPrimaryStorageClass = primary
+	if filesystem.TransitionToPrimaryStorageClass == "" {
+		filesystem.TransitionToPrimaryStorageClass = "NONE"
 	}
 
 	return &filesystem

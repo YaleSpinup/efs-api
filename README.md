@@ -85,6 +85,7 @@ POST `/v1/efs/{account}/filesystems/{group}`
     "Name": "myAwesomeFilesystem",
     "KmsKeyId": "arn:aws:kms:us-east-1:1234567890:key/0000000-1111-1111-1111-33333333333",
     "LifeCycleConfiguration": "NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS",
+    "TransitionToPrimaryStorageClass": "NONE | AFTER_1_ACCESS",
     "BackupPolicy": "ENABLED | DISABLED",
     "OneZone": true,
     "Sgs": ["sg-abc123456789"],
@@ -110,6 +111,7 @@ POST `/v1/efs/{account}/filesystems/{group}`
     "KmsKeyId": "arn:aws:kms:us-east-1:1234567890:key/0000000-1111-1111-1111-33333333333",
     "LifeCycleState": "creating",
     "LifeCycleConfiguration": "NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS",
+    "TransitionToPrimaryStorageClass": "NONE | AFTER_1_ACCESS",
     "MountTargets": [],
     "Name": "myAwesomeFilesystem",
     "NumberOfAccessPoints": 0,
@@ -143,8 +145,8 @@ POST `/v1/efs/{account}/filesystems/{group}`
 
 ### Update FileSystem
 
-The update endpoint allows for updating Tags, BackupPolicy and LifeCycleConfiguration for the filesystem.  All fields
-are optional.  Tags are additive (ie. existing tags are not removed), existing tags will be updated.
+The update endpoint allows for updating Tags, BackupPolicy, LifeCycleConfiguration and TransitionToPrimaryStorageClass
+for the filesystem.  All fields are optional.  Tags are additive (ie. existing tags are not removed), existing tags will be updated.
 
 Update requests are asynchronous and returns a task ID in the header `X-Flywheel-Task`.  This header can
 be used to get the task information and logs from the flywheel HTTP endpoint.
@@ -163,6 +165,7 @@ PUT `/v1/efs/{account}/filesystems/{group}/{id}`
 ```json
 {
     "LifeCycleConfiguration": "NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS",
+    "TransitionToPrimaryStorageClass": "NONE | AFTER_1_ACCESS",
     "BackupPolicy": "ENABLED | DISABLED",
     "Tags": [
         {
