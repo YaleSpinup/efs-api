@@ -131,7 +131,6 @@ func (s *server) filesystemUserUpdatePolicy() (string, error) {
 				},
 				Resource: []string{
 					fmt.Sprintf("arn:aws:iam::*:user/spinup/%s/*", s.org),
-					fmt.Sprintf("arn:aws:iam::*:group/spinup/%s/SpinupECRAdminGroup-%s", s.org, s.org),
 				},
 			},
 		},

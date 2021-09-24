@@ -121,7 +121,7 @@ func Test_server_filesystemUserUpdatePolicy(t *testing.T) {
 			fields: fields{
 				org: "testOrg",
 			},
-			want: `{"Version":"2012-10-17","Statement":[{"Sid":"UpdateRepositoryUser","Effect":"Allow","Action":["iam:UntagUser","iam:DeleteAccessKey","iam:RemoveUserFromGroup","iam:TagUser","iam:CreateAccessKey","iam:ListAccessKeys"],"Resource":["arn:aws:iam::*:user/spinup/testOrg/*","arn:aws:iam::*:group/spinup/testOrg/SpinupECRAdminGroup-testOrg"]}]}`,
+			want: `{"Version":"2012-10-17","Statement":[{"Sid":"UpdateRepositoryUser","Effect":"Allow","Action":["iam:UntagUser","iam:DeleteAccessKey","iam:RemoveUserFromGroup","iam:TagUser","iam:CreateAccessKey","iam:ListAccessKeys"],"Resource":["arn:aws:iam::*:user/spinup/testOrg/*"]}]}`,
 		},
 	}
 	for _, tt := range tests {
