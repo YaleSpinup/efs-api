@@ -1,5 +1,12 @@
 { 
   "listenAddress": ":8080",
+  "account": {
+    "region": "us-east-1",
+    "akid": "xxxxxxxxxxxxxxxxxxxxxxxx",
+    "secret": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+    "externalId": "xxxxxxx-yyyy-zzzz-aaaa-bbbbbbbbb",
+    "role": "someRole"
+  },
   "accounts": {
     "someaccount": {
       "region": "us-east-1",
