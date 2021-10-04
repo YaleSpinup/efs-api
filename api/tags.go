@@ -13,7 +13,7 @@ type Tag struct {
 	Value string
 }
 
-// normalizTags strips the org, spaceid and name from the given tags and ensures they
+// normalizeTags strips the org, spaceid and name from the given tags and ensures they
 // are set to the API org and the group string, name passed to the request
 func normalizeTags(org, name, group string, tags []*Tag) []*Tag {
 	normalizedTags := []*Tag{}
@@ -32,7 +32,8 @@ func normalizeTags(org, name, group string, tags []*Tag) []*Tag {
 		&Tag{
 			Key:   "spinup:org",
 			Value: org,
-		}, &Tag{
+		},
+		&Tag{
 			Key:   "spinup:spaceid",
 			Value: group,
 		})

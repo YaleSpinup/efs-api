@@ -260,7 +260,6 @@ func (s *server) updateTagsForUser(ctx context.Context, account, group, fsid, us
 	}
 
 	name := aws.StringValue(filesystem.Name)
-	// path := fmt.Sprintf("/spinup/%s/%s/%s/", s.org, group, name)
 	userName := fmt.Sprintf("%s-%s", name, user)
 
 	tags = normalizeTags(s.org, userName, group, tags)
