@@ -26,20 +26,24 @@ import (
 
 // Config is representation of the configuration data
 type Config struct {
-	ListenAddress string
+	Account       Account
 	Accounts      map[string]Account
+	AccountsMap   map[string]string
 	Flywheel      Flywheel
-	Token         string
+	ListenAddress string
 	LogLevel      string
-	Version       Version
 	Org           string
+	Token         string
+	Version       Version
 }
 
 // Account is the configuration for an individual account
 type Account struct {
-	Endpoint        string
-	Region          string
 	Akid            string
+	Endpoint        string
+	ExternalID      string
+	Region          string
+	Role            string
 	Secret          string
 	DefaultSgs      []string
 	DefaultSubnets  []string

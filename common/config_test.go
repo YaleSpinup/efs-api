@@ -25,6 +25,13 @@ import (
 var testConfig = []byte(
 	`{
 		"listenAddress": ":8000",
+		"account": {
+			"region": "us-east-1",
+			"akid": "key1",
+			"secret": "secret1",
+			"role": "uber-role",
+			"externalId": "foobar"
+		},
 		"accounts": {
 		  "provider1": {
 			"region": "us-east-1",
@@ -50,6 +57,13 @@ var brokenConfig = []byte(`{ "foobar": { "baz": "biz" }`)
 func TestReadConfig(t *testing.T) {
 	expectedConfig := Config{
 		ListenAddress: ":8000",
+		Account: Account{
+			Region:     "us-east-1",
+			Akid:       "key1",
+			Secret:     "secret1",
+			Role:       "uber-role",
+			ExternalID: "foobar",
+		},
 		Accounts: map[string]Account{
 			"provider1": {
 				Region:          "us-east-1",

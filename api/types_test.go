@@ -63,7 +63,7 @@ func TestNormalizeTags(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		out := s.normalizeTags(test.name, test.group, test.tags)
+		out := normalizeTags(s.org, test.name, test.group, test.tags)
 		if !reflect.DeepEqual(test.expect, out) {
 			t.Errorf("expected %+v, got %+v", awsutil.Prettify(test.expect), awsutil.Prettify(out))
 		}

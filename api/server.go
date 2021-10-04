@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/YaleSpinup/aws-go/services/session"
 	"github.com/YaleSpinup/efs-api/common"
 	"github.com/YaleSpinup/efs-api/ec2"
 	"github.com/YaleSpinup/efs-api/efs"
@@ -36,6 +37,7 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 
+	cache "github.com/patrickmn/go-cache"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -44,14 +46,18 @@ func init() {
 }
 
 type server struct {
+	accountsMap          map[string]string
+	context              context.Context
 	ec2Services          map[string]ec2.EC2
 	efsServices          map[string]efs.EFS
-	rgTaggingAPIServices map[string]resourcegroupstaggingapi.ResourceGroupsTaggingAPI
 	flywheel             *flywheel.Manager
-	router               *mux.Router
-	version              common.Version
-	context              context.Context
 	org                  string
+	orgPolicy            string
+	rgTaggingAPIServices map[string]resourcegroupstaggingapi.ResourceGroupsTaggingAPI
+	router               *mux.Router
+	session              session.Session
+	sessionCache         *cache.Cache
+	version              common.Version
 }
 
 // NewServer creates a new server and starts it
@@ -65,6 +71,7 @@ func NewServer(config common.Config) error {
 	}
 
 	s := server{
+		accountsMap:          config.AccountsMap,
 		ec2Services:          make(map[string]ec2.EC2),
 		efsServices:          make(map[string]efs.EFS),
 		rgTaggingAPIServices: make(map[string]resourcegroupstaggingapi.ResourceGroupsTaggingAPI),
@@ -72,7 +79,14 @@ func NewServer(config common.Config) error {
 		version:              config.Version,
 		context:              ctx,
 		org:                  config.Org,
+		sessionCache:         cache.New(600*time.Second, 900*time.Second),
 	}
+
+	orgPolicy, err := orgTagAccessPolicy(config.Org)
+	if err != nil {
+		return err
+	}
+	s.orgPolicy = orgPolicy
 
 	// Create shared sessions
 	for name, c := range config.Accounts {
@@ -81,6 +95,15 @@ func NewServer(config common.Config) error {
 		s.efsServices[name] = efs.NewSession(c)
 		s.rgTaggingAPIServices[name] = resourcegroupstaggingapi.NewSession(c)
 	}
+
+	// Create a new session used for authentication and assuming cross account roles
+	log.Debugf("Creating new session with key '%s' in region '%s'", config.Account.Akid, config.Account.Region)
+	s.session = session.New(
+		session.WithCredentials(config.Account.Akid, config.Account.Secret, ""),
+		session.WithRegion(config.Account.Region),
+		session.WithExternalID(config.Account.ExternalID),
+		session.WithExternalRoleName(config.Account.Role),
+	)
 
 	manager, err := newFlywheelManager(config.Flywheel)
 	if err != nil {
@@ -229,4 +252,12 @@ func retry(attempts int, sleep time.Duration, f func() error) error {
 	}
 
 	return nil
+}
+
+// if we have an entry for the account name, return the associated account number
+func (s *server) mapAccountNumber(name string) string {
+	if a, ok := s.accountsMap[name]; ok {
+		return a
+	}
+	return name
 }

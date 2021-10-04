@@ -19,8 +19,12 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 		return nil, nil, apierror.New(apierror.ErrNotFound, "account doesnt exist", nil)
 	}
 
+	if req.Name == "" {
+		return nil, nil, apierror.New(apierror.ErrBadRequest, "Name is a required field", nil)
+	}
+
 	// normalize the tags passed in the request
-	req.Tags = s.normalizeTags(req.Name, group, req.Tags)
+	req.Tags = normalizeTags(s.org, req.Name, group, req.Tags)
 
 	// override encryption key if one was passed
 	if req.KmsKeyId == "" {
@@ -347,7 +351,7 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 
 	if req.Tags != nil {
 		// normalize the tags passed in the request
-		req.Tags = s.normalizeTags(aws.StringValue(filesystem.Name), group, req.Tags)
+		req.Tags = normalizeTags(s.org, aws.StringValue(filesystem.Name), group, req.Tags)
 	}
 
 	// generate a new task to track and start it
@@ -388,6 +392,22 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 			if err := service.TagFilesystem(fsCtx, fsid, toEFSTags(req.Tags)); err != nil {
 				errChan <- fmt.Errorf("failed to set tags for filesystem %s: %s", fsid, err.Error())
 				return
+			}
+
+			// TODO remove me once filesystems use account numbers instead of aliases
+			acctNum := s.mapAccountNumber(account)
+
+			users, err := s.listFilesystemUsers(fsCtx, acctNum, group, fsid)
+			if err != nil {
+				errChan <- fmt.Errorf("failed to list users filesystem %s: %s", fsid, err.Error())
+				return
+			}
+
+			for _, u := range users {
+				if err := s.updateTagsForUser(fsCtx, acctNum, group, fsid, u, req.Tags); err != nil {
+					errChan <- fmt.Errorf("failed to list users filesystem %s: %s", fsid, err.Error())
+					return
+				}
 			}
 		}
 
@@ -453,6 +473,17 @@ func (s *server) filesystemDelete(ctx context.Context, account, group, fs string
 		msgChan, errChan := s.startTask(fsCtx, task)
 
 		var err error
+
+		// TODO remove me once filesystems use account numbers instead of aliases
+		acctNum := s.mapAccountNumber(account)
+		users, err := s.deleteAllFilesystemUsers(fsCtx, acctNum, group, fsid)
+		if err != nil {
+			errChan <- err
+			return
+		}
+
+		msgChan <- fmt.Sprintf("deleted filesystem %s users %+v", fsid, users)
+
 		mounttargets, err := service.ListMountTargetsForFileSystem(fsCtx, fsid)
 		if err != nil {
 			errChan <- err

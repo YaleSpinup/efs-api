@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/aws/awsutil"
 	"github.com/aws/aws-sdk-go/service/efs"
+	"github.com/aws/aws-sdk-go/service/iam"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -221,9 +223,26 @@ type AccessPoint struct {
 	RootDirectory *efs.RootDirectory
 }
 
-type Tag struct {
-	Key   string
-	Value string
+// FileSystemUserCreateRequest is the request payload for creating a filsystem user
+type FileSystemUserCreateRequest struct {
+	UserName string
+	// Groups   []string
+}
+
+// FileSystemUserResponse is the response payload for user operations
+type FileSystemUserResponse struct {
+	UserName          string
+	AccessKeys        []*iam.AccessKeyMetadata `json:",omitempty"`
+	AccessKey         *iam.AccessKey           `json:",omitempty"`
+	DeletedAccessKeys []string                 `json:",omitempty"`
+	Groups            []string                 `json:",omitempty"`
+	Tags              []*Tag
+}
+
+// FileSystemUserUpdateRequest is the request payload for updating a user
+type FileSystemUserUpdateRequest struct {
+	ResetKey bool
+	Tags     []*Tag
 }
 
 // fileSystemFromEFS maps an EFS filesystem, list of moutn targets, and list of access points to a common struct
@@ -304,58 +323,6 @@ func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTa
 	}
 
 	return &filesystem
-}
-
-// normalizTags strips the org, spaceid and name from the given tags and ensures they
-// are set to the API org and the group string, name passed to the request
-func (s *server) normalizeTags(name, group string, tags []*Tag) []*Tag {
-	normalizedTags := []*Tag{}
-	for _, t := range tags {
-		if t.Key == "spinup:spaceid" || t.Key == "spinup:org" || t.Key == "Name" {
-			continue
-		}
-		normalizedTags = append(normalizedTags, t)
-	}
-
-	normalizedTags = append(normalizedTags,
-		&Tag{
-			Key:   "Name",
-			Value: name,
-		},
-		&Tag{
-			Key:   "spinup:org",
-			Value: s.org,
-		}, &Tag{
-			Key:   "spinup:spaceid",
-			Value: group,
-		})
-
-	log.Debugf("returning normalized tags: %+v", normalizedTags)
-	return normalizedTags
-}
-
-// fromEFSTags converts from EFS tags to api Tags
-func fromEFSTags(efsTags []*efs.Tag) []*Tag {
-	tags := make([]*Tag, 0, len(efsTags))
-	for _, t := range efsTags {
-		tags = append(tags, &Tag{
-			Key:   aws.StringValue(t.Key),
-			Value: aws.StringValue(t.Value),
-		})
-	}
-	return tags
-}
-
-// toEFSTags converts from api Tags to EFS tags
-func toEFSTags(tags []*Tag) []*efs.Tag {
-	efsTags := make([]*efs.Tag, 0, len(tags))
-	for _, t := range tags {
-		efsTags = append(efsTags, &efs.Tag{
-			Key:   aws.String(t.Key),
-			Value: aws.String(t.Value),
-		})
-	}
-	return efsTags
 }
 
 // listFileSystems returns a list of elasticfilesystems with the given org tag and the group/spaceid tag
@@ -465,4 +432,34 @@ func accessPointResponseFromEFS(ap *efs.AccessPointDescription) *AccessPoint {
 		PosixUser:      ap.PosixUser,
 		RootDirectory:  ap.RootDirectory,
 	}
+}
+
+// filesystemUserResponseFromIAM maps IAM response to a common struct
+func filesystemUserResponseFromIAM(org string, u *iam.User, keys []*iam.AccessKeyMetadata) *FileSystemUserResponse {
+	log.Debugf("mapping iam user %s", awsutil.Prettify(u))
+
+	userName := aws.StringValue(u.UserName)
+
+	// path is format: /spinup/%s/%s/%s/
+	path := strings.Split(aws.StringValue(u.Path), "/")
+
+	if len(path) > 2 {
+		prefix := fmt.Sprintf("%s-", path[len(path)-2])
+
+		log.Debugf("trimming prefix '%s' from username %s", prefix, userName)
+
+		userName = strings.TrimPrefix(userName, prefix)
+	}
+
+	if keys == nil {
+		keys = []*iam.AccessKeyMetadata{}
+	}
+
+	user := FileSystemUserResponse{
+		AccessKeys: keys,
+		Tags:       fromIAMTags(u.Tags),
+		UserName:   userName,
+	}
+
+	return &user
 }
