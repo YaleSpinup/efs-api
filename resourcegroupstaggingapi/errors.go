@@ -88,7 +88,7 @@ func ErrCode(msg string, err error) error {
 			"Not Found":
 			return apierror.New(apierror.ErrNotFound, msg, aerr)
 		default:
-			m := msg + ": " + aerr.Message()
+			m := msg + aerr.Message()
 			return apierror.New(apierror.ErrBadRequest, m, aerr)
 		}
 	}
