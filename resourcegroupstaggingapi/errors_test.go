@@ -22,7 +22,7 @@ func TestErrCode(t *testing.T) {
 
 	for awsErr, apiErr := range apiErrorTestCases {
 		err := ErrCode("test error", awserr.New(awsErr, awsErr, nil))
-		if aerr, ok := errors.Cause(err).(apierror.Error); ok {
+		if aerr, ok := errors.Cause(err).(apierror.Error); ok && aerr.String() == apiErr {
 			t.Logf("got apierror '%s'", aerr)
 		} else {
 			t.Errorf("expected resourcegroupstaggingapi error %s to be an apierror.Error %s, got %s", awsErr, apiErr, err)
