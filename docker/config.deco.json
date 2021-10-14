@@ -27,7 +27,7 @@
   },
   "accountsMap": {
     "spinup": "{{ .spinup_account_number }}",
-    "spinupsec": "{{ .spinupsec_account_number }}",
+    "spinupsec": "{{ .spinupsec_account_number }}"
   },
   "flywheel": {
     "namespace": "{{ .flywheel_namespace }}",
