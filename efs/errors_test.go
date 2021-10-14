@@ -11,8 +11,8 @@ import (
 
 func TestErrCode(t *testing.T) {
 	apiErrorTestCases := map[string]string{
-		"":         apierror.ErrBadRequest,
-		"unknonwn": apierror.ErrBadRequest,
+		"":        apierror.ErrBadRequest,
+		"unknonw": apierror.ErrBadRequest,
 
 		"Forbidden": apierror.ErrForbidden,
 

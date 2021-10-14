@@ -11,8 +11,8 @@ import (
 
 func TestErrCode(t *testing.T) {
 	apiErrorTestCases := map[string]string{
-		"":         apierror.ErrBadRequest,
-		"unknonwn": apierror.ErrBadRequest,
+		"":        apierror.ErrBadRequest,
+		"unknonw": apierror.ErrBadRequest,
 		resourcegroupstaggingapi.ErrCodeInternalServiceException:        apierror.ErrInternalError,
 		resourcegroupstaggingapi.ErrCodeConcurrentModificationException: apierror.ErrConflict,
 		resourcegroupstaggingapi.ErrCodeThrottledException:              apierror.ErrConflict,
