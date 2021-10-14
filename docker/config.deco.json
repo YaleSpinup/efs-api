@@ -25,6 +25,10 @@
       "defaultKmsKeyId": "{{ .spinupsec_default_kms_key_id }}"
     }
   },
+  "accountsMap": {
+    "spinup": "{{ .spinup_account_number }}",
+    "spinupsec": "{{ .spinupsec_account_number }}",
+  },
   "flywheel": {
     "namespace": "{{ .flywheel_namespace }}",
     "redisAddress": "{{ .redis_address }}",

@@ -25,6 +25,10 @@
       "defaultSubnets": ["subnet-MDAwMDAwMDAwMDAwMA", "subnet-MTExMTExMTExMTE"]
     }
   },
+  "accountsMap": {
+    "spinup": "1234567890",
+    "spinupsec": "0987654321"
+  },
   "flywheel": {
     "namespace": "efsapi",
     "redisAddress": "127.0.0.1:6379",
