@@ -11,7 +11,8 @@ import (
 
 func TestErrCode(t *testing.T) {
 	apiErrorTestCases := map[string]string{
-		"": apierror.ErrBadRequest,
+		"":        apierror.ErrBadRequest,
+		"unknonw": apierror.ErrBadRequest,
 
 		"Forbidden": apierror.ErrForbidden,
 
@@ -53,11 +54,16 @@ func TestErrCode(t *testing.T) {
 	}
 
 	for awsErr, apiErr := range apiErrorTestCases {
+		expected := apierror.New(apiErr, "test error", awserr.New(awsErr, awsErr, nil))
 		err := ErrCode("test error", awserr.New(awsErr, awsErr, nil))
-		if aerr, ok := errors.Cause(err).(apierror.Error); ok {
-			t.Logf("got apierror '%s'", aerr)
-		} else {
-			t.Errorf("expected cloudwatch error %s to be an apierror.Error %s, got %s", awsErr, apiErr, err)
+
+		var aerr apierror.Error
+		if !errors.As(err, &aerr) {
+			t.Errorf("expected aws error %s to be an apierror.Error %s, got %s", awsErr, apiErr, err)
+		}
+
+		if aerr.String() != expected.String() {
+			t.Errorf("expected error '%s', got '%s'", expected, aerr)
 		}
 	}
 

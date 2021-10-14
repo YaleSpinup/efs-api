@@ -229,8 +229,7 @@ func ErrCode(msg string, err error) error {
 
 			return apierror.New(apierror.ErrServiceUnavailable, msg, aerr)
 		default:
-			m := msg + ": " + aerr.Message()
-			return apierror.New(apierror.ErrBadRequest, m, aerr)
+			return apierror.New(apierror.ErrBadRequest, msg, aerr)
 		}
 	}
 
