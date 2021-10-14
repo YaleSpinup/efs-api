@@ -29,10 +29,10 @@ RUN chmod 555 /app/api
 RUN apk add --no-cache bash ca-certificates
 
 # Install Deco
-ARG DECO_VERSION=1.0.2
+ARG DECO_VERSION=1.3.0
 ARG DECO_OS=linux
 ARG DECO_ARCH=amd64
-ADD https://github.com/YaleUniversity/deco/releases/download/v${DECO_VERSION}/deco-v${DECO_VERSION}-${DECO_OS}-${DECO_ARCH}.tar.gz /usr/local/bin/deco.tar.gz
+ADD https://github.com/YaleUniversity/deco/releases/download/v${DECO_VERSION}/deco_${DECO_VERSION}_${DECO_OS}_${DECO_ARCH}.tar.gz /usr/local/bin/deco.tar.gz
 RUN cd /usr/local/bin && tar -zxvf deco.tar.gz && rm -f deco.tar.gz && chmod 555 deco && /usr/local/bin/deco version
 
 COPY docker/*_config.sh /app
