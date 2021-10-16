@@ -12,109 +12,79 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (s *server) createFilesystemUser(ctx context.Context, account, group, fsid string, req *FileSystemUserCreateRequest) (*FileSystemUserResponse, error) {
-	if req.UserName == "" {
-		return nil, apierror.New(apierror.ErrBadRequest, "Username is a required field", nil)
-	}
-
-	log.Infof("creating filesystem %s user %s", fsid, req.UserName)
-
-	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
-
-	policy, err := s.filesystemUserCreatePolicy()
-	if err != nil {
-		return nil, apierror.New(apierror.ErrInternalError, "failed to generate policy", err)
-	}
-
-	// IAM doesn't support resource tags, so we can't pass the s.orgPolicy here
-	session, err := s.assumeRole(
-		ctx,
-		s.session.ExternalID,
-		role,
-		policy,
-		"arn:aws:iam::aws:policy/AmazonElasticFileSystemReadOnlyAccess",
-	)
-	if err != nil {
-		msg := fmt.Sprintf("failed to assume role in account: %s", account)
-		return nil, apierror.New(apierror.ErrForbidden, msg, nil)
-	}
-
-	efsService := efs.New(efs.WithSession(session.Session))
-	iamService := iam.New(iam.WithSession(session.Session))
-
-	filesystem, err := efsService.GetFileSystem(ctx, fsid)
+func (o *userOrchestrator) createFilesystemUser(ctx context.Context, account, group, fsid string, req *FileSystemUserCreateRequest) (*FileSystemUserResponse, error) {
+	filesystem, err := o.efsClient.GetFileSystem(ctx, fsid)
 	if err != nil {
 		return nil, err
 	}
 
 	name := aws.StringValue(filesystem.Name)
-	path := fmt.Sprintf("/spinup/%s/%s/%s/", s.org, group, name)
+	path := fmt.Sprintf("/spinup/%s/%s/%s/", o.org, group, name)
 	userName := fmt.Sprintf("%s-%s", name, req.UserName)
 
-	tags := normalizeTags(s.org, userName, group, fromEFSTags(filesystem.Tags))
+	// set the user tags from the filesystems
+	tags := normalizeTags(o.org, userName, group, fromEFSTags(filesystem.Tags))
+	tags = append(tags, &Tag{
+		Key:   "ResourceName",
+		Value: aws.StringValue(filesystem.Name),
+	})
 
-	user, err := iamService.CreateUser(ctx, userName, path, toIAMTags(tags))
+	user, err := o.iamClient.CreateUser(ctx, userName, path, toIAMTags(tags))
 	if err != nil {
 		return nil, err
 	}
 
-	if err := iamService.WaitForUser(ctx, userName); err != nil {
+	if err := o.iamClient.WaitForUser(ctx, userName); err != nil {
 		return nil, err
 	}
 
-	return filesystemUserResponseFromIAM(s.org, user, nil), nil
+	grp := fmt.Sprintf("%s-%s", "SpinupEFSAdminGroup", o.org)
+
+	if err := o.iamClient.AddUserToGroup(ctx, userName, grp); err != nil {
+		return nil, err
+	}
+
+	return filesystemUserResponseFromIAM(o.org, user, nil), nil
 }
 
 // deleteFilesystemUser deletes a filesystem user and all associated access keys
-func (s *server) deleteFilesystemUser(ctx context.Context, account, group, fsid, user string) error {
-	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
-
-	policy, err := s.filesystemUserDeletePolicy()
-	if err != nil {
-		return apierror.New(apierror.ErrInternalError, "failed to generate policy", err)
-	}
-
-	// IAM doesn't support resource tags, so we can't pass the s.orgPolicy here
-	session, err := s.assumeRole(
-		ctx,
-		s.session.ExternalID,
-		role,
-		policy,
-		"arn:aws:iam::aws:policy/AmazonElasticFileSystemReadOnlyAccess",
-	)
-	if err != nil {
-		msg := fmt.Sprintf("failed to assume role in account: %s", account)
-		return apierror.New(apierror.ErrForbidden, msg, nil)
-	}
-
-	efsService := efs.New(efs.WithSession(session.Session))
-	iamService := iam.New(iam.WithSession(session.Session))
-
-	filesystem, err := efsService.GetFileSystem(ctx, fsid)
+func (o *userOrchestrator) deleteFilesystemUser(ctx context.Context, account, group, fsid, user string) error {
+	filesystem, err := o.efsClient.GetFileSystem(ctx, fsid)
 	if err != nil {
 		return err
 	}
 	name := aws.StringValue(filesystem.Name)
 
-	path := fmt.Sprintf("/spinup/%s/%s/%s/", s.org, group, name)
+	path := fmt.Sprintf("/spinup/%s/%s/%s/", o.org, group, name)
 	userName := fmt.Sprintf("%s-%s", name, user)
 
-	if _, err := iamService.GetUserWithPath(ctx, path, userName); err != nil {
+	if _, err := o.iamClient.GetUserWithPath(ctx, path, userName); err != nil {
 		return err
 	}
 
-	keys, err := iamService.ListAccessKeys(ctx, userName)
+	groups, err := o.iamClient.ListGroupsForUser(ctx, userName)
+	if err != nil {
+		return err
+	}
+
+	for _, g := range groups {
+		if err := o.iamClient.RemoveUserFromGroup(ctx, userName, g); err != nil {
+			return err
+		}
+	}
+
+	keys, err := o.iamClient.ListAccessKeys(ctx, userName)
 	if err != nil {
 		return err
 	}
 
 	for _, k := range keys {
-		if err := iamService.DeleteAccessKey(ctx, userName, aws.StringValue(k.AccessKeyId)); err != nil {
+		if err := o.iamClient.DeleteAccessKey(ctx, userName, aws.StringValue(k.AccessKeyId)); err != nil {
 			return err
 		}
 	}
 
-	if err := iamService.DeleteUser(ctx, userName); err != nil {
+	if err := o.iamClient.DeleteUser(ctx, userName); err != nil {
 		return err
 	}
 
@@ -122,15 +92,15 @@ func (s *server) deleteFilesystemUser(ctx context.Context, account, group, fsid,
 }
 
 // deleteAllFilesystemUsers deletes all users for a repository
-func (s *server) deleteAllFilesystemUsers(ctx context.Context, account, group, fsid string) ([]string, error) {
+func (o *userOrchestrator) deleteAllFilesystemUsers(ctx context.Context, account, group, fsid string) ([]string, error) {
 	// list all users for the repository
-	users, err := s.listFilesystemUsers(ctx, account, group, fsid)
+	users, err := o.listFilesystemUsers(ctx, account, group, fsid)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, u := range users {
-		if err := s.deleteFilesystemUser(ctx, account, group, fsid, u); err != nil {
+		if err := o.deleteFilesystemUser(ctx, account, group, fsid, u); err != nil {
 			log.Errorf("failed to delete filesystem %s user %s: %s", fsid, u, err)
 		}
 	}
@@ -139,35 +109,16 @@ func (s *server) deleteAllFilesystemUsers(ctx context.Context, account, group, f
 }
 
 // listFilesystemUsers lists the IAM users in a path specific to the filesystem
-func (s *server) listFilesystemUsers(ctx context.Context, account, group, fsid string) ([]string, error) {
-	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
-
-	// IAM doesn't support resource tags, so we can't pass the s.orgPolicy here
-	session, err := s.assumeRole(
-		ctx,
-		s.session.ExternalID,
-		role,
-		"",
-		"arn:aws:iam::aws:policy/IAMReadOnlyAccess",
-		"arn:aws:iam::aws:policy/AmazonElasticFileSystemReadOnlyAccess",
-	)
-	if err != nil {
-		msg := fmt.Sprintf("failed to assume role in account: %s", account)
-		return nil, apierror.New(apierror.ErrForbidden, msg, nil)
-	}
-
-	efsService := efs.New(efs.WithSession(session.Session))
-	iamService := iam.New(iam.WithSession(session.Session))
-
-	filesystem, err := efsService.GetFileSystem(ctx, fsid)
+func (o *userOrchestrator) listFilesystemUsers(ctx context.Context, account, group, fsid string) ([]string, error) {
+	filesystem, err := o.efsClient.GetFileSystem(ctx, fsid)
 	if err != nil {
 		return nil, err
 	}
 	name := aws.StringValue(filesystem.Name)
 
-	path := fmt.Sprintf("/spinup/%s/%s/%s/", s.org, group, name)
+	path := fmt.Sprintf("/spinup/%s/%s/%s/", o.org, group, name)
 
-	users, err := iamService.ListUsers(ctx, path)
+	users, err := o.iamClient.ListUsers(ctx, path)
 	if err != nil {
 		return nil, err
 	}
@@ -186,46 +137,27 @@ func (s *server) listFilesystemUsers(ctx context.Context, account, group, fsid s
 }
 
 // getFilesystemUser gets the details about a filesystem user with the username generated from the fs name and the passed username
-func (s *server) getFilesystemUser(ctx context.Context, account, group, fsid, user string) (*FileSystemUserResponse, error) {
-	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
-
-	// IAM doesn't support resource tags, so we can't pass the s.orgPolicy here
-	session, err := s.assumeRole(
-		ctx,
-		s.session.ExternalID,
-		role,
-		"",
-		"arn:aws:iam::aws:policy/AmazonElasticFileSystemReadOnlyAccess",
-		"arn:aws:iam::aws:policy/IAMReadOnlyAccess",
-	)
-	if err != nil {
-		msg := fmt.Sprintf("failed to assume role in account: %s", account)
-		return nil, apierror.New(apierror.ErrForbidden, msg, nil)
-	}
-
-	efsService := efs.New(efs.WithSession(session.Session))
-	iamService := iam.New(iam.WithSession(session.Session))
-
-	filesystem, err := efsService.GetFileSystem(ctx, fsid)
+func (o *userOrchestrator) getFilesystemUser(ctx context.Context, account, group, fsid, user string) (*FileSystemUserResponse, error) {
+	filesystem, err := o.efsClient.GetFileSystem(ctx, fsid)
 	if err != nil {
 		return nil, err
 	}
 	name := aws.StringValue(filesystem.Name)
 
-	path := fmt.Sprintf("/spinup/%s/%s/%s/", s.org, group, name)
+	path := fmt.Sprintf("/spinup/%s/%s/%s/", o.org, group, name)
 	userName := fmt.Sprintf("%s-%s", name, user)
 
-	iamUser, err := iamService.GetUserWithPath(ctx, path, userName)
+	iamUser, err := o.iamClient.GetUserWithPath(ctx, path, userName)
 	if err != nil {
 		return nil, err
 	}
 
-	keys, err := iamService.ListAccessKeys(ctx, userName)
+	keys, err := o.iamClient.ListAccessKeys(ctx, userName)
 	if err != nil {
 		return nil, err
 	}
 
-	return filesystemUserResponseFromIAM(s.org, iamUser, keys), nil
+	return filesystemUserResponseFromIAM(o.org, iamUser, keys), nil
 }
 
 func (s *server) updateTagsForUser(ctx context.Context, account, group, fsid, user string, tags []*Tag) error {
