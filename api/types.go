@@ -226,7 +226,6 @@ type AccessPoint struct {
 // FileSystemUserCreateRequest is the request payload for creating a filsystem user
 type FileSystemUserCreateRequest struct {
 	UserName string
-	// Groups   []string
 }
 
 // FileSystemUserResponse is the response payload for user operations

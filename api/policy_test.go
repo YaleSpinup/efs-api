@@ -86,7 +86,7 @@ func Test_server_filesystemUserDeletePolicy(t *testing.T) {
 			fields: fields{
 				org: "testOrg",
 			},
-			want: `{"Version":"2012-10-17","Statement":[{"Sid":"DeleteRepositoryUser","Effect":"Allow","Action":["iam:DeleteAccessKey","iam:RemoveUserFromGroup","iam:ListAccessKeys","iam:ListGroupsForUser","iam:DeleteUser","iam:GetUser"],"Resource":["arn:aws:iam::*:user/spinup/testOrg/*"]}]}`,
+			want: `{"Version":"2012-10-17","Statement":[{"Sid":"DeleteRepositoryUser","Effect":"Allow","Action":["iam:DeleteAccessKey","iam:RemoveUserFromGroup","iam:ListAccessKeys","iam:ListGroupsForUser","iam:ListUsers","iam:DeleteUser","iam:GetUser"],"Resource":["arn:aws:iam::*:user/spinup/testOrg/*","arn:aws:iam::*:group/spinup/testOrg/*"]}]}`,
 		},
 	}
 	for _, tt := range tests {

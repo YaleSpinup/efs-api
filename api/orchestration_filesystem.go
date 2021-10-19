@@ -9,6 +9,10 @@ import (
 	"github.com/YaleSpinup/flywheel"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/efs"
+
+	yiam "github.com/YaleSpinup/aws-go/services/iam"
+	yefs "github.com/YaleSpinup/efs-api/efs"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -394,10 +398,32 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 				return
 			}
 
-			// TODO remove me once filesystems use account numbers instead of aliases
+			// TODO The following mapping of account numbers and assumerole code should be updated
+			// once the filesystem orchestrations functions are moved to use account numbers (instead of
+			// aliases) and to use orchestrators instead of depending on the server struct.
 			acctNum := s.mapAccountNumber(account)
 
-			users, err := s.listFilesystemUsers(fsCtx, acctNum, group, fsid)
+			role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+
+			// IAM doesn't support resource tags, so we can't pass the s.orgPolicy here
+			session, err := s.assumeRole(
+				fsCtx,
+				s.session.ExternalID,
+				role,
+				"",
+				"arn:aws:iam::aws:policy/IAMReadOnlyAccess",
+				"arn:aws:iam::aws:policy/AmazonElasticFileSystemReadOnlyAccess",
+			)
+			if err != nil {
+				return
+			}
+
+			efsService := yefs.New(yefs.WithSession(session.Session))
+			iamService := yiam.New(yiam.WithSession(session.Session))
+
+			orch := newUserOrchestrator(iamService, efsService, s.org)
+
+			users, err := orch.listFilesystemUsers(fsCtx, acctNum, group, fsid)
 			if err != nil {
 				errChan <- fmt.Errorf("failed to list users filesystem %s: %s", fsid, err.Error())
 				return
@@ -405,7 +431,7 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 
 			for _, u := range users {
 				if err := s.updateTagsForUser(fsCtx, acctNum, group, fsid, u, req.Tags); err != nil {
-					errChan <- fmt.Errorf("failed to list users filesystem %s: %s", fsid, err.Error())
+					errChan <- fmt.Errorf("failed to update tags for users of filesystem %s: %s", fsid, err.Error())
 					return
 				}
 			}
@@ -474,9 +500,37 @@ func (s *server) filesystemDelete(ctx context.Context, account, group, fs string
 
 		var err error
 
-		// TODO remove me once filesystems use account numbers instead of aliases
+		// TODO The following mapping of account numbers and assumerole code should be updated
+		// once the filesystem orchestrations functions are moved to use account numbers (instead of
+		// aliases) and to use orchestrators instead of depending on the server struct.
 		acctNum := s.mapAccountNumber(account)
-		users, err := s.deleteAllFilesystemUsers(fsCtx, acctNum, group, fsid)
+
+		role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+		policy, err := s.filesystemUserDeletePolicy()
+		if err != nil {
+			errChan <- err
+			return
+		}
+
+		// IAM doesn't support resource tags, so we can't pass the s.orgPolicy here
+		session, err := s.assumeRole(
+			fsCtx,
+			s.session.ExternalID,
+			role,
+			policy,
+			"arn:aws:iam::aws:policy/AmazonElasticFileSystemReadOnlyAccess",
+		)
+		if err != nil {
+			errChan <- err
+			return
+		}
+
+		efsService := yefs.New(yefs.WithSession(session.Session))
+		iamService := yiam.New(yiam.WithSession(session.Session))
+
+		orch := newUserOrchestrator(iamService, efsService, s.org)
+
+		users, err := orch.deleteAllFilesystemUsers(fsCtx, acctNum, group, fsid)
 		if err != nil {
 			errChan <- err
 			return

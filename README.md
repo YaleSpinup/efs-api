@@ -27,6 +27,15 @@ This API provides simple restful API access to EFS services.
       - [Example get accesspoint response](#example-get-accesspoint-response)
     - [Delete an accesspoint](#delete-an-accesspoint)
       - [Example delete accesspoint response](#example-delete-accesspoint-response)
+    - [Create a filesystem user](#create-a-filesystem-user)
+      - [Example create user request](#example-create-user-request)
+      - [Example create user response](#example-create-user-response)
+    - [List users for a filesystem](#list-users-for-a-filesystem)
+      - [Example list users response](#example-list-users-response)
+    - [Get details about a filesystem user](#get-details-about-a-filesystem-user)
+      - [Example get user response](#example-get-user-response)
+    - [Delete a filesystem user](#delete-a-filesystem-user)
+      - [Example get user response](#example-get-user-response-1)
     - [Get task information for asynchronous tasks](#get-task-information-for-asynchronous-tasks)
       - [Example task response](#example-task-response)
   - [License](#license)
@@ -306,7 +315,7 @@ DELETE `/v1/efs/{account}/filesystems/{group}/{id}`
 
 ### Create an accesspoint for a filesystem
 
-Creating an accesspoint generates an accesspoint for a filesystem.  The
+Creating an accesspoint generates an accesspoint for a filesystem.
 
 POST `/v1/efs/{account}/filesystems/{group}/{id}/aps`
 
@@ -403,6 +412,93 @@ DELETE `/v1/efs/{account}/filesystems/{group}/{id}/aps/{apid}`
 OK
 ```
 
+### Create a filesystem user
+
+Creates a user with full access to a filesystem
+
+POST `/v1/efs/{account}/filesystems/{group}/{id}/users`
+
+#### Example create user request
+
+```json
+{
+    "Username": "someuser"
+}
+```
+
+#### Example create user response
+
+```json
+{
+    "UserName": "someuser",
+    "Tags": []
+}
+```
+
+| Response Code                 | Definition              |
+| ----------------------------- | ------------------------|
+| **200 OK**                    | create a user           |
+| **400 Bad Request**           | badly formed request    |
+| **404 Not Found**             | account not found       |
+| **500 Internal Server Error** | a server error occurred |
+
+### List users for a filesystem
+
+GET ``/v1/efs/{account}/filesystems/{group}/{id}/users`
+
+#### Example list users response
+
+```json
+[
+    "someuser",
+    "someotheruser"
+]
+```
+
+| Response Code                 | Definition              |
+| ----------------------------- | ------------------------|
+| **200 OK**                    | list all users          |
+| **400 Bad Request**           | badly formed request    |
+| **404 Not Found**             | account not found       |
+| **500 Internal Server Error** | a server error occurred |
+
+### Get details about a filesystem user
+
+GET ``/v1/efs/{account}/filesystems/{group}/{id}/users/{username}`
+
+#### Example get user response
+
+```json
+{
+    "UserName": "someuser",
+    "Tags": []
+}
+```
+
+| Response Code                 | Definition              |
+| ----------------------------- | ------------------------|
+| **200 OK**                    | get a user              |
+| **400 Bad Request**           | badly formed request    |
+| **404 Not Found**             | account not found       |
+| **500 Internal Server Error** | a server error occurred |
+
+### Delete a filesystem user
+
+DELETE ``/v1/efs/{account}/filesystems/{group}/{id}/users/{username}`
+
+#### Example get user response
+
+```json
+OK
+```
+
+| Response Code                 | Definition              |
+| ----------------------------- | ------------------------|
+| **200 OK**                    | delete a user           |
+| **400 Bad Request**           | badly formed request    |
+| **404 Not Found**             | account not found       |
+| **500 Internal Server Error** | a server error occurred |
+
 ### Get task information for asynchronous tasks
 
 GET /v1/efs/flywheel?task=xxx[&task=yyy&task=zzz]
@@ -455,4 +551,4 @@ GET /v1/efs/flywheel?task=xxx[&task=yyy&task=zzz]
 ## License
 
 GNU Affero General Public License v3.0 (GNU AGPLv3)  
-Copyright © 2020 Yale University
+Copyright © 2021 Yale University

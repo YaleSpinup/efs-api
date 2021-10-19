@@ -96,11 +96,13 @@ func (s *server) filesystemUserDeletePolicy() (string, error) {
 					"iam:RemoveUserFromGroup",
 					"iam:ListAccessKeys",
 					"iam:ListGroupsForUser",
+					"iam:ListUsers",
 					"iam:DeleteUser",
 					"iam:GetUser",
 				},
 				Resource: []string{
 					fmt.Sprintf("arn:aws:iam::*:user/spinup/%s/*", s.org),
+					fmt.Sprintf("arn:aws:iam::*:group/spinup/%s/*", s.org),
 				},
 			},
 		},
