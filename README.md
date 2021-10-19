@@ -30,6 +30,9 @@ This API provides simple restful API access to EFS services.
     - [Create a filesystem user](#create-a-filesystem-user)
       - [Example create user request](#example-create-user-request)
       - [Example create user response](#example-create-user-response)
+    - [Update a filesystem user](#update-a-filesystem-user)
+      - [Example update user request](#example-update-user-request)
+      - [Example update user response](#example-update-user-response)
     - [List users for a filesystem](#list-users-for-a-filesystem)
       - [Example list users response](#example-list-users-response)
     - [Get details about a filesystem user](#get-details-about-a-filesystem-user)
@@ -431,13 +434,51 @@ POST `/v1/efs/{account}/filesystems/{group}/{id}/users`
 ```json
 {
     "UserName": "someuser",
-    "Tags": []
 }
 ```
 
 | Response Code                 | Definition              |
 | ----------------------------- | ------------------------|
 | **200 OK**                    | create a user           |
+| **400 Bad Request**           | badly formed request    |
+| **404 Not Found**             | account not found       |
+| **500 Internal Server Error** | a server error occurred |
+
+### Update a filesystem user
+
+Updating a user is primarily used to reset the access keys for that user.
+
+PUT `/v1/efs/{account}/filesystems/{group}/{id}/users/{username}`
+
+#### Example update user request
+
+```json
+{
+    "ResetKey": true,
+}
+```
+
+#### Example update user response
+
+```json
+{
+    "UserName": "someuser",
+    "AccessKey": {
+        "AccessKeyId": "XXXXXXXXXX",
+        "CreateDate": "2021-10-19T22:58:03Z",
+        "SecretAccessKey": "yyyyyyyyyyyyyyyyyyyyyyyyyy",
+        "Status": "Active",
+        "UserName": "myAwesomeFilesystem-someuser"
+    },
+    "DeletedAccessKeys": [
+        "ZZZZZZZZZZZ"
+    ]
+}
+```
+
+| Response Code                 | Definition              |
+| ----------------------------- | ------------------------|
+| **200 OK**                    | update a user           |
 | **400 Bad Request**           | badly formed request    |
 | **404 Not Found**             | account not found       |
 | **500 Internal Server Error** | a server error occurred |
@@ -471,7 +512,6 @@ GET ``/v1/efs/{account}/filesystems/{group}/{id}/users/{username}`
 ```json
 {
     "UserName": "someuser",
-    "Tags": []
 }
 ```
 

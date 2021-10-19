@@ -124,6 +124,7 @@ func (s *server) filesystemUserUpdatePolicy() (string, error) {
 				Sid:    "UpdateRepositoryUser",
 				Effect: "Allow",
 				Action: []string{
+					"iam:GetUser",
 					"iam:UntagUser",
 					"iam:DeleteAccessKey",
 					"iam:RemoveUserFromGroup",
@@ -133,6 +134,7 @@ func (s *server) filesystemUserUpdatePolicy() (string, error) {
 				},
 				Resource: []string{
 					fmt.Sprintf("arn:aws:iam::*:user/spinup/%s/*", s.org),
+					fmt.Sprintf("arn:aws:iam::*:group/spinup/%s/SpinupEFSAdminGroup-%s", s.org, s.org),
 				},
 			},
 		},

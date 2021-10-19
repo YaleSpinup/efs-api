@@ -235,13 +235,12 @@ type FileSystemUserResponse struct {
 	AccessKey         *iam.AccessKey           `json:",omitempty"`
 	DeletedAccessKeys []string                 `json:",omitempty"`
 	Groups            []string                 `json:",omitempty"`
-	Tags              []*Tag
+	Tags              []*Tag                   `json:",omitempty"`
 }
 
 // FileSystemUserUpdateRequest is the request payload for updating a user
 type FileSystemUserUpdateRequest struct {
 	ResetKey bool
-	Tags     []*Tag
 }
 
 // fileSystemFromEFS maps an EFS filesystem, list of moutn targets, and list of access points to a common struct
@@ -456,7 +455,6 @@ func filesystemUserResponseFromIAM(org string, u *iam.User, keys []*iam.AccessKe
 
 	user := FileSystemUserResponse{
 		AccessKeys: keys,
-		Tags:       fromIAMTags(u.Tags),
 		UserName:   userName,
 	}
 
