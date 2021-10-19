@@ -39,7 +39,7 @@ var EfsAdminPolicy = iam.PolicyDocument{
 // cachePolicyDoc generates the string value of the policy document the first time it's used and keeps
 // it in memory to prevent marshalling static data on each request.
 func cachePolicyDoc() error {
-	// initialize ecr admin policy document
+	// initialize efs admin policy document
 	policyDoc, err := json.Marshal(EfsAdminPolicy)
 	if err != nil {
 		return err
