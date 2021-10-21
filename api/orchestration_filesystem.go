@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -22,6 +23,11 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 	if !ok {
 		return nil, nil, apierror.New(apierror.ErrNotFound, "account doesnt exist", nil)
 	}
+
+	// TODO The following mapping of account numbers hould be updated once the filesystem orchestrations
+	// functions are moved to use account numbers (instead of aliases) and to use orchestrators instead
+	// of depending on the server struct.
+	acctNum := s.mapAccountNumber(account)
 
 	if req.Name == "" {
 		return nil, nil, apierror.New(apierror.ErrBadRequest, "Name is a required field", nil)
@@ -173,6 +179,23 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 			return
 		}
 
+		if req.AccessPolicy != nil {
+			msgChan <- fmt.Sprintf("setting filesystem %s access policy to %+v", fsid, req.AccessPolicy)
+
+			var policy []byte
+			policy, err = json.Marshal(efsPolicyFromFilSystemAccessPolicy(acctNum, group, aws.StringValue(filesystem.FileSystemArn), req.AccessPolicy))
+			if err != nil {
+				errChan <- fmt.Errorf("failed to marshall access policy for filesystem %s: %s", fsid, err.Error())
+				return
+			}
+
+			err = service.SetFileSystemPolicy(fsCtx, fsid, string(policy))
+			if err != nil {
+				errChan <- fmt.Errorf("failed to set access policy for filesystem %s: %s", fsid, err.Error())
+				return
+			}
+		}
+
 		mounttargets := []*efs.MountTargetDescription{}
 		for _, subnet := range req.Subnets {
 			if req.Sgs == nil {
@@ -292,10 +315,15 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 
 	}()
 
-	return fileSystemResponseFromEFS(filesystem, nil, nil, req.BackupPolicy, req.LifeCycleConfiguration, req.TransitionToPrimaryStorageClass), task, nil
+	return fileSystemResponseFromEFS(filesystem, nil, nil, req.AccessPolicy, req.BackupPolicy, req.LifeCycleConfiguration, req.TransitionToPrimaryStorageClass), task, nil
 }
 
 func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string, req *FileSystemUpdateRequest) (*flywheel.Task, error) {
+	// TODO The following mapping of account numbers hould be updated once the filesystem orchestrations
+	// functions are moved to use account numbers (instead of aliases) and to use orchestrators instead
+	// of depending on the server struct.
+	acctNum := s.mapAccountNumber(account)
+
 	service, ok := s.efsServices[account]
 	if !ok {
 		return nil, apierror.New(apierror.ErrNotFound, "account doesnt exist", nil)
@@ -390,6 +418,23 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 			}
 		}
 
+		if req.AccessPolicy != nil {
+			msgChan <- fmt.Sprintf("setting filesystem %s access policy to %+v", fsid, req.AccessPolicy)
+
+			var policy []byte
+			policy, err = json.Marshal(efsPolicyFromFilSystemAccessPolicy(acctNum, group, aws.StringValue(filesystem.FileSystemArn), req.AccessPolicy))
+			if err != nil {
+				errChan <- fmt.Errorf("failed to marshall access policy for filesystem %s: %s", fsid, err.Error())
+				return
+			}
+
+			err = service.SetFileSystemPolicy(fsCtx, fsid, string(policy))
+			if err != nil {
+				errChan <- fmt.Errorf("failed to set access policy for filesystem %s: %s", fsid, err.Error())
+				return
+			}
+		}
+
 		if req.Tags != nil {
 			msgChan <- fmt.Sprintf("updating tags for filesystem %s ", fsid)
 
@@ -398,11 +443,9 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 				return
 			}
 
-			// TODO The following mapping of account numbers and assumerole code should be updated
+			// TODO The following assumerole code should be updated
 			// once the filesystem orchestrations functions are moved to use account numbers (instead of
 			// aliases) and to use orchestrators instead of depending on the server struct.
-			acctNum := s.mapAccountNumber(account)
-
 			role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
 
 			// IAM doesn't support resource tags, so we can't pass the s.orgPolicy here

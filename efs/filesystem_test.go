@@ -12,7 +12,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/awsutil"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/efs"
+	"github.com/aws/aws-sdk-go/service/efs/efsiface"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 )
@@ -858,5 +860,102 @@ func TestTagFileSystem(t *testing.T) {
 		}
 	} else {
 		t.Errorf("expected apierror.Error, got: %s", reflect.TypeOf(err).String())
+	}
+}
+
+func TestEFS_SetFileSystemPolicy(t *testing.T) {
+	type fields struct {
+		session         *session.Session
+		Service         efsiface.EFSAPI
+		DefaultKmsKeyId string
+		DefaultSgs      []string
+		DefaultSubnets  []string
+	}
+	type args struct {
+		ctx    context.Context
+		id     string
+		policy string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "empty id",
+			args: args{
+				ctx:    context.TODO(),
+				policy: "{}",
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty policy",
+			args: args{
+				ctx: context.TODO(),
+				id:  "fs-12345",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := &EFS{
+				session:         tt.fields.session,
+				Service:         tt.fields.Service,
+				DefaultKmsKeyId: tt.fields.DefaultKmsKeyId,
+				DefaultSgs:      tt.fields.DefaultSgs,
+				DefaultSubnets:  tt.fields.DefaultSubnets,
+			}
+			if err := e.SetFileSystemPolicy(tt.args.ctx, tt.args.id, tt.args.policy); (err != nil) != tt.wantErr {
+				t.Errorf("EFS.SetFileSystemPolicy() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestEFS_GetFileSystemPolicy(t *testing.T) {
+	type fields struct {
+		session         *session.Session
+		Service         efsiface.EFSAPI
+		DefaultKmsKeyId string
+		DefaultSgs      []string
+		DefaultSubnets  []string
+	}
+	type args struct {
+		ctx context.Context
+		id  string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name:    "empty id",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := &EFS{
+				session:         tt.fields.session,
+				Service:         tt.fields.Service,
+				DefaultKmsKeyId: tt.fields.DefaultKmsKeyId,
+				DefaultSgs:      tt.fields.DefaultSgs,
+				DefaultSubnets:  tt.fields.DefaultSubnets,
+			}
+			got, err := e.GetFileSystemPolicy(tt.args.ctx, tt.args.id)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("EFS.GetFileSystemPolicy() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("EFS.GetFileSystemPolicy() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

@@ -147,3 +147,109 @@ func (s *server) filesystemUserUpdatePolicy() (string, error) {
 
 	return string(j), nil
 }
+
+// efsPolicyFromFilSystemAccessPolicy constructs the EFS resource policy from the filesystem access policy flags
+func efsPolicyFromFilSystemAccessPolicy(account, group, fsArn string, policy *FileSystemAccessPolicy) *iam.PolicyDocument {
+	if policy == nil {
+		return nil
+	}
+
+	policyDoc := iam.PolicyDocument{
+		Version:   "2012-10-17",
+		Id:        "efs-resource-policy-document",
+		Statement: []iam.StatementEntry{},
+	}
+
+	if policy.EnforceEncryptedTransport {
+		ep := iam.StatementEntry{
+			Sid:       "DenyUnencryptedTransport",
+			Effect:    "Deny",
+			Principal: iam.Principal{"AWS": []string{"*"}},
+			Action:    []string{"*"},
+			Resource:  []string{fsArn},
+			Condition: iam.Condition{
+				"Bool": iam.ConditionStatement{
+					"aws:SecureTransport": []string{"false"},
+				},
+			},
+		}
+		policyDoc.Statement = append(policyDoc.Statement, ep)
+	}
+
+	if !policy.AllowAnonymousAccess {
+		anonPolicy := iam.StatementEntry{
+			Sid:       "DenyAnonymousAccess",
+			Effect:    "Allow",
+			Principal: iam.Principal{"AWS": []string{"*"}},
+			Action: []string{
+				"elasticfilesystem:ClientRootAccess",
+				"elasticfilesystem:ClientWrite",
+			},
+			Resource: []string{fsArn},
+			Condition: iam.Condition{
+				"Bool": iam.ConditionStatement{
+					"elasticfilesystem:AccessedViaMountTarget": []string{"true"},
+				},
+			},
+		}
+		policyDoc.Statement = append(policyDoc.Statement, anonPolicy)
+	}
+
+	if policy.AllowEcsTaskExecutionRole {
+		roleArn := fmt.Sprintf("arn:aws:iam::%s:role/%s-ecsTaskExecution", account, group)
+		log.Debugf("generated ecs task execution role arn: %s", roleArn)
+
+		ecsPolicy := iam.StatementEntry{
+			Sid:    "AllowECSAccessFromHomeSpace",
+			Effect: "Allow",
+			Principal: iam.Principal{
+				"AWS": []string{roleArn},
+			},
+			Action: []string{
+				"elasticfilesystem:ClientRootAccess",
+				"elasticfilesystem:ClientWrite",
+				"elasticfilesystem:ClientMount",
+			},
+			Resource: []string{fsArn},
+			Condition: iam.Condition{
+				"Bool": iam.ConditionStatement{
+					"elasticfilesystem:AccessedViaMountTarget": []string{"true"},
+				},
+			},
+		}
+		policyDoc.Statement = append(policyDoc.Statement, ecsPolicy)
+	}
+
+	return &policyDoc
+}
+
+// filSystemAccessPolicyFromEfsPolicy naively constructs the filesystem access policy flags from the SIDs defined in the EFS policy doc
+func filSystemAccessPolicyFromEfsPolicy(policy string) (*FileSystemAccessPolicy, error) {
+	if policy == "" {
+		return nil, nil
+	}
+
+	policyDoc := iam.PolicyDocument{}
+	if err := json.Unmarshal([]byte(policy), &policyDoc); err != nil {
+		return nil, err
+	}
+
+	accessPolicy := FileSystemAccessPolicy{
+		AllowAnonymousAccess:      true,
+		EnforceEncryptedTransport: false,
+		AllowEcsTaskExecutionRole: false,
+	}
+
+	for _, s := range policyDoc.Statement {
+		switch s.Sid {
+		case "DenyUnencryptedTransport":
+			accessPolicy.EnforceEncryptedTransport = true
+		case "DenyAnonymousAccess":
+			accessPolicy.AllowAnonymousAccess = false
+		case "AllowECSAccessFromHomeSpace":
+			accessPolicy.AllowEcsTaskExecutionRole = true
+		}
+	}
+
+	return &accessPolicy, nil
+}

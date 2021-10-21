@@ -77,6 +77,26 @@ func ErrCode(msg string, err error) error {
 			// account.
 			efs.ErrCodeMountTargetNotFound,
 
+			//efs.ErrCodePolicyNotFound for service response error code
+			// "PolicyNotFound".
+			//
+			// Returned if the default file system policy is in effect for the EFS file
+			// system specified.
+			efs.ErrCodePolicyNotFound,
+
+			//efs.ErrCodeSecurityGroupNotFound for service response error code
+			// "SecurityGroupNotFound".
+			//
+			// Returned if one of the specified security groups doesn't exist in the subnet's
+			// VPC.
+			efs.ErrCodeSecurityGroupNotFound,
+
+			//efs.ErrCodeSubnetNotFound for service response error code
+			// "SubnetNotFound".
+			//
+			// Returned if there is no subnet with ID SubnetId provided in the request.
+			efs.ErrCodeSubnetNotFound,
+
 			// Not found.
 			"NotFound":
 
@@ -120,32 +140,12 @@ func ErrCode(msg string, err error) error {
 			// the case of a policy lockout safety check error.
 			efs.ErrCodeInvalidPolicyException,
 
-			//efs.ErrCodePolicyNotFound for service response error code
-			// "PolicyNotFound".
-			//
-			// Returned if the default file system policy is in effect for the EFS file
-			// system specified.
-			efs.ErrCodePolicyNotFound,
-
 			//efs.ErrCodeSecurityGroupLimitExceeded for service response error code
 			// "SecurityGroupLimitExceeded".
 			//
 			// Returned if the size of SecurityGroups specified in the request is greater
 			// than five.
 			efs.ErrCodeSecurityGroupLimitExceeded,
-
-			//efs.ErrCodeSecurityGroupNotFound for service response error code
-			// "SecurityGroupNotFound".
-			//
-			// Returned if one of the specified security groups doesn't exist in the subnet's
-			// VPC.
-			efs.ErrCodeSecurityGroupNotFound,
-
-			//efs.ErrCodeSubnetNotFound for service response error code
-			// "SubnetNotFound".
-			//
-			// Returned if there is no subnet with ID SubnetId provided in the request.
-			efs.ErrCodeSubnetNotFound,
 
 			//efs.ErrCodeUnsupportedAvailabilityZone for service response error code
 			// "UnsupportedAvailabilityZone".

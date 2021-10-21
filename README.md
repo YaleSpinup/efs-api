@@ -5,6 +5,10 @@ This API provides simple restful API access to EFS services.
 - [efs-api](#efs-api)
   - [Endpoints](#endpoints)
   - [Authentication](#authentication)
+  - [Filesystem Access Policies](#filesystem-access-policies)
+    - [AllowAnonymousAccess](#allowanonymousaccess)
+    - [EnforceEncryptedTransport](#enforceencryptedtransport)
+    - [AllowEcsTaskExecutionRole](#allowecstaskexecutionrole)
   - [Usage](#usage)
     - [Create a FileSystem](#create-a-filesystem)
       - [Example create request body](#example-create-request-body)
@@ -69,6 +73,28 @@ DELETE /v1/efs/{account}/filesystems/{group}/{id}/aps/{apid}
 
 Authentication is accomplished via a pre-shared key.  This is done via the `X-Auth-Token` header.
 
+## Filesystem Access Policies
+
+The filesystem access policy object allows toggling access policies for a filesystem.
+
+### AllowAnonymousAccess
+
+When set to `true`, allows access without authenticating with an IAM user.
+
+Default: `true`
+
+### EnforceEncryptedTransport
+
+When set to `true`, enforces encrypted transport when mounting the filesystem.
+
+Default: `false`
+
+### AllowEcsTaskExecutionRole
+
+When set to `true`, allows all containers executing with the space level ECS task execution role to access the filesystem.
+
+Default: `false`
+
 ## Usage
 
 ### Create a FileSystem
@@ -95,6 +121,11 @@ POST `/v1/efs/{account}/filesystems/{group}`
 ```json
 {
     "Name": "myAwesomeFilesystem",
+    "AccessPolicy": {
+        "AllowAnonymousAccess": false,
+        "EnforceEncryptedTransport": true,
+        "AllowEcsTaskExecutionRole": true
+    },
     "KmsKeyId": "arn:aws:kms:us-east-1:1234567890:key/0000000-1111-1111-1111-33333333333",
     "LifeCycleConfiguration": "NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS",
     "TransitionToPrimaryStorageClass": "NONE | AFTER_1_ACCESS",
@@ -115,6 +146,11 @@ POST `/v1/efs/{account}/filesystems/{group}`
 ```json
 {
     "AccessPoints": [],
+    "AccessPolicy": {
+        "AllowAnonymousAccess": false,
+        "EnforceEncryptedTransport": true,
+        "AllowEcsTaskExecutionRole": true
+    },
     "AvailabilityZone": "us-east-1a",
     "BackupPolicy": "ENABLED | DISABLED",
     "CreationTime": "2020-08-06T11:14:45Z",
@@ -176,6 +212,11 @@ PUT `/v1/efs/{account}/filesystems/{group}/{id}`
 
 ```json
 {
+    "AccessPolicy": {
+        "AllowAnonymousAccess": false,
+        "EnforceEncryptedTransport": true,
+        "AllowEcsTaskExecutionRole": true
+    },
     "LifeCycleConfiguration": "NONE | AFTER_7_DAYS | AFTER_14_DAYS | AFTER_30_DAYS | AFTER_60_DAYS | AFTER_90_DAYS",
     "TransitionToPrimaryStorageClass": "NONE | AFTER_1_ACCESS",
     "BackupPolicy": "ENABLED | DISABLED",
@@ -246,6 +287,11 @@ GET `/v1/efs/{account}/filesystems/{group}/{id}`
 ```json
 {
     "AccessPoints": [],
+    "AccessPolicy": {
+        "AllowAnonymousAccess": false,
+        "EnforceEncryptedTransport": true,
+        "AllowEcsTaskExecutionRole": true
+    },
     "BackupPolicy": "ENABLED | ENABLING | DISABLED | DISABLING",
     "CreationTime": "2020-08-06T11:14:45Z",
     "FileSystemArn": "arn:aws:elasticfilesystem:us-east-1:1234567890:file-system/fs-9876543",
