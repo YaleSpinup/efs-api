@@ -148,8 +148,8 @@ func (s *server) filesystemUserUpdatePolicy() (string, error) {
 	return string(j), nil
 }
 
-// efsPolicyFromFilSystemAccessPolicy constructs the EFS resource policy from the filesystem access policy flags
-func efsPolicyFromFilSystemAccessPolicy(account, group, fsArn string, policy *FileSystemAccessPolicy) *iam.PolicyDocument {
+// efsPolicyFromFileSystemAccessPolicy constructs the EFS resource policy from the filesystem access policy flags
+func efsPolicyFromFileSystemAccessPolicy(account, group, fsArn string, policy *FileSystemAccessPolicy) *iam.PolicyDocument {
 	if policy == nil {
 		return nil
 	}

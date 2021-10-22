@@ -144,7 +144,7 @@ func Test_server_filesystemUserUpdatePolicy(t *testing.T) {
 	}
 }
 
-func Test_efsPolicyFromFilSystemAccessPolicy(t *testing.T) {
+func Test_efsPolicyFromFileSystemAccessPolicy(t *testing.T) {
 	type args struct {
 		account string
 		group   string
@@ -254,8 +254,8 @@ func Test_efsPolicyFromFilSystemAccessPolicy(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := efsPolicyFromFilSystemAccessPolicy(tt.args.account, tt.args.group, tt.args.fsArn, tt.args.policy); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("efsPolicyFromFilSystemAccessPolicy() = %v, want %v", got, tt.want)
+			if got := efsPolicyFromFileSystemAccessPolicy(tt.args.account, tt.args.group, tt.args.fsArn, tt.args.policy); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("efsPolicyFromFileSystemAccessPolicy() = %v, want %v", got, tt.want)
 			}
 		})
 	}

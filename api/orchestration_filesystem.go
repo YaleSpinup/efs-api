@@ -183,7 +183,7 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 			msgChan <- fmt.Sprintf("setting filesystem %s access policy to %+v", fsid, req.AccessPolicy)
 
 			var policy []byte
-			policy, err = json.Marshal(efsPolicyFromFilSystemAccessPolicy(acctNum, group, aws.StringValue(filesystem.FileSystemArn), req.AccessPolicy))
+			policy, err = json.Marshal(efsPolicyFromFileSystemAccessPolicy(acctNum, group, aws.StringValue(filesystem.FileSystemArn), req.AccessPolicy))
 			if err != nil {
 				errChan <- fmt.Errorf("failed to marshall access policy for filesystem %s: %s", fsid, err.Error())
 				return
@@ -422,7 +422,7 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 			msgChan <- fmt.Sprintf("setting filesystem %s access policy to %+v", fsid, req.AccessPolicy)
 
 			var policy []byte
-			policy, err = json.Marshal(efsPolicyFromFilSystemAccessPolicy(acctNum, group, aws.StringValue(filesystem.FileSystemArn), req.AccessPolicy))
+			policy, err = json.Marshal(efsPolicyFromFileSystemAccessPolicy(acctNum, group, aws.StringValue(filesystem.FileSystemArn), req.AccessPolicy))
 			if err != nil {
 				errChan <- fmt.Errorf("failed to marshall access policy for filesystem %s: %s", fsid, err.Error())
 				return
