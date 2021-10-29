@@ -226,3 +226,62 @@ func (s *server) UsersShowHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write(j)
 }
+
+// UsersUpdateHandler updates a filesystem user
+func (s *server) UsersUpdateHandler(w http.ResponseWriter, r *http.Request) {
+	w = LogWriter{w}
+	vars := mux.Vars(r)
+	account := s.mapAccountNumber(vars["account"])
+	group := vars["group"]
+	fsid := vars["id"]
+	userName := vars["user"]
+
+	req := FileSystemUserUpdateRequest{}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		msg := fmt.Sprintf("cannot decode body into update filesystem user input: %s", err)
+		handleError(w, apierror.New(apierror.ErrBadRequest, msg, err))
+		return
+	}
+
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
+	policy, err := s.filesystemUserUpdatePolicy()
+	if err != nil {
+		handleError(w, apierror.New(apierror.ErrInternalError, "failed to generate policy", err))
+		return
+	}
+
+	// IAM doesn't support resource tags, so we can't pass the s.orgPolicy here
+	session, err := s.assumeRole(
+		r.Context(),
+		s.session.ExternalID,
+		role,
+		policy,
+		"arn:aws:iam::aws:policy/AmazonElasticFileSystemReadOnlyAccess",
+	)
+	if err != nil {
+		msg := fmt.Sprintf("failed to assume role in account: %s", account)
+		handleError(w, apierror.New(apierror.ErrForbidden, msg, nil))
+		return
+	}
+
+	efsService := efs.New(efs.WithSession(session.Session))
+	iamService := iam.New(iam.WithSession(session.Session))
+
+	orch := newUserOrchestrator(iamService, efsService, s.org)
+
+	resp, err := orch.updateFilesystemUser(r.Context(), account, group, fsid, userName, &req)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+
+	j, err := json.Marshal(resp)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(j)
+}

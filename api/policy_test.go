@@ -1,7 +1,10 @@
 package api
 
 import (
+	"reflect"
 	"testing"
+
+	"github.com/YaleSpinup/aws-go/services/iam"
 )
 
 func Test_orgTagAccessPolicy(t *testing.T) {
@@ -121,7 +124,7 @@ func Test_server_filesystemUserUpdatePolicy(t *testing.T) {
 			fields: fields{
 				org: "testOrg",
 			},
-			want: `{"Version":"2012-10-17","Statement":[{"Sid":"UpdateRepositoryUser","Effect":"Allow","Action":["iam:UntagUser","iam:DeleteAccessKey","iam:RemoveUserFromGroup","iam:TagUser","iam:CreateAccessKey","iam:ListAccessKeys"],"Resource":["arn:aws:iam::*:user/spinup/testOrg/*"]}]}`,
+			want: `{"Version":"2012-10-17","Statement":[{"Sid":"UpdateRepositoryUser","Effect":"Allow","Action":["iam:GetUser","iam:UntagUser","iam:DeleteAccessKey","iam:RemoveUserFromGroup","iam:TagUser","iam:CreateAccessKey","iam:ListAccessKeys"],"Resource":["arn:aws:iam::*:user/spinup/testOrg/*","arn:aws:iam::*:group/spinup/testOrg/SpinupEFSAdminGroup-testOrg"]}]}`,
 		},
 	}
 	for _, tt := range tests {
@@ -136,6 +139,180 @@ func Test_server_filesystemUserUpdatePolicy(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("server.filesystemUserUpdatePolicy() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_efsPolicyFromFileSystemAccessPolicy(t *testing.T) {
+	type args struct {
+		account string
+		group   string
+		fsArn   string
+		policy  *FileSystemAccessPolicy
+	}
+	tests := []struct {
+		name string
+		args args
+		want *iam.PolicyDocument
+	}{
+		{
+			name: "empty policy",
+			args: args{},
+			want: nil,
+		},
+		{
+			name: "DenyUnencryptedTransport",
+			args: args{
+				account: "1234567890",
+				group:   "mygroup",
+				fsArn:   "arn:aws:elasticfilesystem:us-east-1:1234567890:file-system/fs-aabbccddeeff",
+				policy:  &FileSystemAccessPolicy{true, true, false},
+			},
+			want: &iam.PolicyDocument{
+				Version: "2012-10-17",
+				Id:      "efs-resource-policy-document",
+				Statement: []iam.StatementEntry{
+					{
+						Sid:       "DenyUnencryptedTransport",
+						Effect:    "Deny",
+						Principal: iam.Principal{"AWS": []string{"*"}},
+						Action:    []string{"*"},
+						Resource:  []string{"arn:aws:elasticfilesystem:us-east-1:1234567890:file-system/fs-aabbccddeeff"},
+						Condition: iam.Condition{
+							"Bool": iam.ConditionStatement{
+								"aws:SecureTransport": []string{"false"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "AllowECSAccessFromHomeSpace",
+			args: args{
+				account: "1234567890",
+				group:   "mygroup",
+				fsArn:   "arn:aws:elasticfilesystem:us-east-1:1234567890:file-system/fs-aabbccddeeff",
+				policy:  &FileSystemAccessPolicy{true, false, true},
+			},
+			want: &iam.PolicyDocument{
+				Version: "2012-10-17",
+				Id:      "efs-resource-policy-document",
+				Statement: []iam.StatementEntry{
+					{
+						Sid:    "AllowECSAccessFromHomeSpace",
+						Effect: "Allow",
+						Principal: iam.Principal{
+							"AWS": []string{"arn:aws:iam::1234567890:role/mygroup-ecsTaskExecution"},
+						},
+						Action: []string{
+							"elasticfilesystem:ClientRootAccess",
+							"elasticfilesystem:ClientWrite",
+							"elasticfilesystem:ClientMount",
+						},
+						Resource: []string{"arn:aws:elasticfilesystem:us-east-1:1234567890:file-system/fs-aabbccddeeff"},
+						Condition: iam.Condition{
+							"Bool": iam.ConditionStatement{
+								"elasticfilesystem:AccessedViaMountTarget": []string{"true"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "disable anonymous access",
+			args: args{
+				account: "1234567890",
+				group:   "mygroup",
+				fsArn:   "arn:aws:elasticfilesystem:us-east-1:1234567890:file-system/fs-aabbccddeeff",
+				policy:  &FileSystemAccessPolicy{false, false, false},
+			},
+			want: &iam.PolicyDocument{
+				Version: "2012-10-17",
+				Id:      "efs-resource-policy-document",
+				Statement: []iam.StatementEntry{
+					{
+						Sid:       "DenyAnonymousAccess",
+						Effect:    "Allow",
+						Principal: iam.Principal{"AWS": []string{"*"}},
+						Action: []string{
+							"elasticfilesystem:ClientRootAccess",
+							"elasticfilesystem:ClientWrite",
+						},
+						Resource: []string{"arn:aws:elasticfilesystem:us-east-1:1234567890:file-system/fs-aabbccddeeff"},
+						Condition: iam.Condition{
+							"Bool": iam.ConditionStatement{
+								"elasticfilesystem:AccessedViaMountTarget": []string{"true"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := efsPolicyFromFileSystemAccessPolicy(tt.args.account, tt.args.group, tt.args.fsArn, tt.args.policy); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("efsPolicyFromFileSystemAccessPolicy() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_filSystemAccessPolicyFromEfsPolicy(t *testing.T) {
+	type args struct {
+		policy string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *FileSystemAccessPolicy
+		wantErr bool
+	}{
+		{
+			name: "empty",
+			want: nil,
+		},
+		{
+			name: "defaults",
+			args: args{
+				policy: `{"Statement": []}`,
+			},
+			want: &FileSystemAccessPolicy{true, false, false},
+		},
+		{
+			name: "DenyUnencryptedTransport",
+			args: args{
+				policy: `{"Statement": [{"Sid":"DenyUnencryptedTransport"}]}`,
+			},
+			want: &FileSystemAccessPolicy{true, true, false},
+		},
+		{
+			name: "DenyAnonymousAccess",
+			args: args{
+				policy: `{"Statement": [{"Sid":"DenyAnonymousAccess"}]}`,
+			},
+			want: &FileSystemAccessPolicy{false, false, false},
+		},
+		{
+			name: "AllowECSAccessFromHomeSpace",
+			args: args{
+				policy: `{"Statement": [{"Sid":"AllowECSAccessFromHomeSpace"}]}`,
+			},
+			want: &FileSystemAccessPolicy{true, false, true},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := filSystemAccessPolicyFromEfsPolicy(tt.args.policy)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("filSystemAccessPolicyFromEfsPolicy() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("filSystemAccessPolicyFromEfsPolicy() = %v, want %v", got, tt.want)
 			}
 		})
 	}

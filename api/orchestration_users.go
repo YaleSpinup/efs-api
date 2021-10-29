@@ -160,6 +160,52 @@ func (o *userOrchestrator) getFilesystemUser(ctx context.Context, account, group
 	return filesystemUserResponseFromIAM(o.org, iamUser, keys), nil
 }
 
+// updateFilesystemUser updates a user for a filesystem
+func (o *userOrchestrator) updateFilesystemUser(ctx context.Context, account, group, fsid, user string, req *FileSystemUserUpdateRequest) (*FileSystemUserResponse, error) {
+	filesystem, err := o.efsClient.GetFileSystem(ctx, fsid)
+	if err != nil {
+		return nil, err
+	}
+
+	name := aws.StringValue(filesystem.Name)
+	userName := fmt.Sprintf("%s-%s", name, user)
+
+	if _, err := o.getFilesystemUser(ctx, account, group, fsid, user); err != nil {
+		return nil, err
+	}
+
+	response := &FileSystemUserResponse{
+		UserName: user,
+	}
+
+	if req.ResetKey {
+		// get a list of users access keys
+		keys, err := o.iamClient.ListAccessKeys(ctx, userName)
+		if err != nil {
+			return nil, err
+		}
+
+		newKeyOut, err := o.iamClient.CreateAccessKey(ctx, userName)
+		if err != nil {
+			return nil, err
+		}
+		response.AccessKey = newKeyOut
+
+		deletedKeyIds := make([]string, 0, len(keys))
+		// delete the old access keys
+		for _, k := range keys {
+			if err = o.iamClient.DeleteAccessKey(ctx, userName, aws.StringValue(k.AccessKeyId)); err != nil {
+				return response, err
+			}
+			deletedKeyIds = append(deletedKeyIds, aws.StringValue(k.AccessKeyId))
+		}
+
+		response.DeletedAccessKeys = deletedKeyIds
+	}
+
+	return response, nil
+}
+
 func (s *server) updateTagsForUser(ctx context.Context, account, group, fsid, user string, tags []*Tag) error {
 	log.Infof("updating tags for filesystem %s user %s", fsid, user)
 

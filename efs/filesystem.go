@@ -214,6 +214,45 @@ func (e *EFS) GetFilesystemBackup(ctx context.Context, id string) (string, error
 	return "DISABLED", nil
 }
 
+func (e *EFS) SetFileSystemPolicy(ctx context.Context, id, policy string) error {
+	if id == "" || policy == "" {
+		return apierror.New(apierror.ErrBadRequest, "invalid input", nil)
+	}
+
+	log.Infof("setting filesystem policy for efs filesystem %s to %s", id, policy)
+
+	out, err := e.Service.PutFileSystemPolicyWithContext(ctx, &efs.PutFileSystemPolicyInput{
+		FileSystemId: aws.String(id),
+		Policy:       aws.String(policy),
+	})
+	if err != nil {
+		return ErrCode("failed to set filesystem policy", err)
+	}
+
+	log.Debugf("got output when setting filesystem policy for %s: %+v", id, awsutil.Prettify(out))
+
+	return nil
+}
+
+func (e *EFS) GetFileSystemPolicy(ctx context.Context, id string) (string, error) {
+	if id == "" {
+		return "", apierror.New(apierror.ErrBadRequest, "invalid input", nil)
+	}
+
+	log.Infof("getting filesystem policy for efs filesystem %s", id)
+
+	out, err := e.Service.DescribeFileSystemPolicyWithContext(ctx, &efs.DescribeFileSystemPolicyInput{
+		FileSystemId: aws.String(id),
+	})
+	if err != nil {
+		return "", ErrCode("failed to get filesystem policy", err)
+	}
+
+	log.Debugf("got output when describing filesystem policy for %s: %+v", id, awsutil.Prettify(out))
+
+	return aws.StringValue(out.Policy), nil
+}
+
 func (e *EFS) TagFilesystem(ctx context.Context, id string, tags []*efs.Tag) error {
 	if id == "" || tags == nil {
 		return apierror.New(apierror.ErrBadRequest, "invalid input", nil)

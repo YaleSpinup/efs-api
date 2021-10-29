@@ -41,6 +41,7 @@ func (s *server) routes() {
 	api.HandleFunc("/{account}/filesystems/{group}/{id}/users", s.UsersCreateHandler).Methods(http.MethodPost)
 	api.HandleFunc("/{account}/filesystems/{group}/{id}/users", s.UsersListHandler).Methods(http.MethodGet)
 	api.HandleFunc("/{account}/filesystems/{group}/{id}/users/{user}", s.UsersShowHandler).Methods(http.MethodGet)
+	api.HandleFunc("/{account}/filesystems/{group}/{id}/users/{user}", s.UsersUpdateHandler).Methods(http.MethodPut)
 	api.HandleFunc("/{account}/filesystems/{group}/{id}/users/{user}", s.UsersDeleteHandler).Methods(http.MethodDelete)
 
 	api.HandleFunc("/{account}/filesystems/{group}/{id}/aps", s.FileSystemAPListHandler).Methods(http.MethodGet)
