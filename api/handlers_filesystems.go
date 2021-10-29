@@ -8,6 +8,7 @@ import (
 	"github.com/YaleSpinup/apierror"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -129,7 +130,24 @@ func (s *server) FileSystemShowHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	output := fileSystemResponseFromEFS(filesystem, mounttargets, accessPoints, backup, transitionToIA, transitionToPrimary)
+	policyString, err := efsService.GetFileSystemPolicy(r.Context(), aws.StringValue(filesystem.FileSystemId))
+	if err != nil {
+		if aerr, ok := errors.Cause(err).(apierror.Error); ok {
+			if aerr.Code != apierror.ErrNotFound {
+				log.Errorf("error: %s", aerr)
+				handleError(w, err)
+				return
+			}
+		}
+	}
+
+	policy, err := filSystemAccessPolicyFromEfsPolicy(policyString)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+
+	output := fileSystemResponseFromEFS(filesystem, mounttargets, accessPoints, policy, backup, transitionToIA, transitionToPrimary)
 	j, err := json.Marshal(output)
 	if err != nil {
 		log.Errorf("cannot marshal response (%v) into JSON: %s", output, err)

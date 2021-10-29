@@ -34,6 +34,9 @@ type FileSystemCreateRequest struct {
 	// AccessPoints is an optional list of access points to create
 	AccessPoints []*AccessPointCreateRequest
 
+	// AccessPolicy is a set of flags to control access to the filesystem
+	AccessPolicy *FileSystemAccessPolicy
+
 	// BackupPolicy is the backup policy/status for the filesystem
 	// Valid values are ENABLED | DISABLED
 	BackupPolicy string
@@ -64,6 +67,9 @@ type FileSystemCreateRequest struct {
 
 // FileSystemUpdateRequest is the input for updating a filesystem
 type FileSystemUpdateRequest struct {
+	// AccessPolicy is a set of flags to control access to the filesystem
+	AccessPolicy *FileSystemAccessPolicy
+
 	// BackupPolicy is the backup policy/status for the filesystem
 	// Valid values are ENABLED | DISABLED
 	BackupPolicy string
@@ -89,6 +95,9 @@ type listFileSystemsResponse []string
 type FileSystemResponse struct {
 	// list of access points associated with the filesystem
 	AccessPoints []*AccessPoint
+
+	// AccessPolicy is a set of flags to control access to the filesystem
+	AccessPolicy *FileSystemAccessPolicy
 
 	// availability zone the filesystem is using
 	AvailabilityZone string
@@ -148,6 +157,13 @@ type FileSystemResponse struct {
 
 	// The tags associated with the file system.
 	Tags []*Tag
+}
+
+// FileSystemAccessPolicy is a set of flags to control access to the filesystem
+type FileSystemAccessPolicy struct {
+	AllowAnonymousAccess      bool
+	EnforceEncryptedTransport bool
+	AllowEcsTaskExecutionRole bool
 }
 
 type FileSystemSize struct {
@@ -244,10 +260,11 @@ type FileSystemUserUpdateRequest struct {
 }
 
 // fileSystemFromEFS maps an EFS filesystem, list of moutn targets, and list of access points to a common struct
-func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTargetDescription, aps []*efs.AccessPointDescription, backup, ia, primary string) *FileSystemResponse {
+func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTargetDescription, aps []*efs.AccessPointDescription, policy *FileSystemAccessPolicy, backup, ia, primary string) *FileSystemResponse {
 	log.Debugf("mapping filesystem %s", awsutil.Prettify(fs))
 
 	filesystem := FileSystemResponse{
+		AccessPolicy:         policy,
 		BackupPolicy:         backup,
 		CreationTime:         aws.TimeValue(fs.CreationTime),
 		FileSystemArn:        aws.StringValue(fs.FileSystemArn),
