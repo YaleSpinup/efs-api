@@ -176,7 +176,20 @@ func efsPolicyFromFileSystemAccessPolicy(account, group, fsArn string, policy *F
 		policyDoc.Statement = append(policyDoc.Statement, ep)
 	}
 
-	if !policy.AllowAnonymousAccess {
+	if policy.AllowAnonymousAccess {
+		anonPolicy := iam.StatementEntry{
+			Sid:       "AllowAnonymousAccess",
+			Effect:    "Allow",
+			Principal: iam.Principal{"AWS": []string{"*"}},
+			Action: []string{
+				"elasticfilesystem:ClientRootAccess",
+				"elasticfilesystem:ClientWrite",
+				"elasticfilesystem:ClientMount",
+			},
+			Resource: []string{fsArn},
+		}
+		policyDoc.Statement = append(policyDoc.Statement, anonPolicy)
+	} else {
 		anonPolicy := iam.StatementEntry{
 			Sid:       "DenyAnonymousAccess",
 			Effect:    "Allow",
