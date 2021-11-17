@@ -1,6 +1,8 @@
 package api
 
 import (
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/efs"
 	"github.com/aws/aws-sdk-go/service/iam"
@@ -14,13 +16,19 @@ type Tag struct {
 }
 
 // normalizeTags strips the org, spaceid and name from the given tags and ensures they
-// are set to the API org and the group string, name passed to the request
+// are set to the API org and the group string, name passed to the request.  it also
+// skips any aws specific tags
 func normalizeTags(org, name, group string, tags []*Tag) []*Tag {
 	normalizedTags := []*Tag{}
 	for _, t := range tags {
 		if t.Key == "spinup:spaceid" || t.Key == "spinup:org" || t.Key == "Name" {
 			continue
 		}
+
+		if strings.HasPrefix(t.Key, "aws:") {
+			continue
+		}
+
 		normalizedTags = append(normalizedTags, t)
 	}
 

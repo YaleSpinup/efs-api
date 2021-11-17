@@ -185,6 +185,17 @@ func Test_efsPolicyFromFileSystemAccessPolicy(t *testing.T) {
 							},
 						},
 					},
+					{
+						Sid:       "AllowAnonymousAccess",
+						Effect:    "Allow",
+						Principal: iam.Principal{"AWS": []string{"*"}},
+						Action: []string{
+							"elasticfilesystem:ClientRootAccess",
+							"elasticfilesystem:ClientWrite",
+							"elasticfilesystem:ClientMount",
+						},
+						Resource: []string{"arn:aws:elasticfilesystem:us-east-1:1234567890:file-system/fs-aabbccddeeff"},
+					},
 				},
 			},
 		},
@@ -200,6 +211,17 @@ func Test_efsPolicyFromFileSystemAccessPolicy(t *testing.T) {
 				Version: "2012-10-17",
 				Id:      "efs-resource-policy-document",
 				Statement: []iam.StatementEntry{
+					{
+						Sid:       "AllowAnonymousAccess",
+						Effect:    "Allow",
+						Principal: iam.Principal{"AWS": []string{"*"}},
+						Action: []string{
+							"elasticfilesystem:ClientRootAccess",
+							"elasticfilesystem:ClientWrite",
+							"elasticfilesystem:ClientMount",
+						},
+						Resource: []string{"arn:aws:elasticfilesystem:us-east-1:1234567890:file-system/fs-aabbccddeeff"},
+					},
 					{
 						Sid:    "AllowECSAccessFromHomeSpace",
 						Effect: "Allow",

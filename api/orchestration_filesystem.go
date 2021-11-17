@@ -421,14 +421,15 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 		if req.AccessPolicy != nil {
 			msgChan <- fmt.Sprintf("setting filesystem %s access policy to %+v", fsid, req.AccessPolicy)
 
-			var policy []byte
-			policy, err = json.Marshal(efsPolicyFromFileSystemAccessPolicy(acctNum, group, aws.StringValue(filesystem.FileSystemArn), req.AccessPolicy))
+			policy := efsPolicyFromFileSystemAccessPolicy(acctNum, group, aws.StringValue(filesystem.FileSystemArn), req.AccessPolicy)
+			var policyDoc []byte
+			policyDoc, err = json.Marshal(policy)
 			if err != nil {
 				errChan <- fmt.Errorf("failed to marshall access policy for filesystem %s: %s", fsid, err.Error())
 				return
 			}
 
-			err = service.SetFileSystemPolicy(fsCtx, fsid, string(policy))
+			err = service.SetFileSystemPolicy(fsCtx, fsid, string(policyDoc))
 			if err != nil {
 				errChan <- fmt.Errorf("failed to set access policy for filesystem %s: %s", fsid, err.Error())
 				return
