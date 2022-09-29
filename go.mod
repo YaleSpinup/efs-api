@@ -6,7 +6,7 @@ require (
 	github.com/YaleSpinup/apierror v0.1.0
 	github.com/YaleSpinup/aws-go v0.2.0
 	github.com/YaleSpinup/flywheel v0.3.0
-	github.com/aws/aws-sdk-go v1.44.96
+	github.com/aws/aws-sdk-go v1.44.98
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/go-redis/redis/v8 v8.11.5 // indirect
@@ -20,7 +20,7 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/sirupsen/logrus v1.9.0
 	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90
-	golang.org/x/sys v0.0.0-20220909162455-aba9fc2a8ff2 // indirect
+	golang.org/x/sys v0.0.0-20220913175220-63ea55921009 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 )
 
