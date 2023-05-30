@@ -16,8 +16,11 @@ import (
 
 // EC2 is a wrapper around the aws EC2 service with some default config info
 type EC2 struct {
+	session *session.Session
 	Service ec2iface.EC2API
 }
+
+type EC2Option func(*EC2)
 
 // NewSession creates a new EFS session
 func NewSession(account common.Account) EC2 {
@@ -56,4 +59,36 @@ func (e *EC2) GetSubnet(ctx context.Context, subnet string) (*ec2.Subnet, error)
 	}
 
 	return out.Subnets[0], nil
+}
+
+func New(opts ...EC2Option) EC2 {
+	e := EC2{}
+
+	for _, opt := range opts {
+		opt(&e)
+	}
+
+	if e.session != nil {
+		e.Service = ec2.New(e.session)
+	}
+
+	return e
+}
+
+func WithSession(sess *session.Session) EC2Option {
+	return func(e *EC2) {
+		log.Debug("using aws session")
+		e.session = sess
+	}
+}
+
+func WithCredentials(key, secret, token, region string) EC2Option {
+	return func(e *EC2) {
+		log.Debugf("creating new session with key id %s in region %s", key, region)
+		sess := session.Must(session.NewSession(&aws.Config{
+			Credentials: credentials.NewStaticCredentials(key, secret, token),
+			Region:      aws.String(region),
+		}))
+		e.session = sess
+	}
 }
