@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/YaleSpinup/apierror"
+	yefs "github.com/YaleSpinup/efs-api/efs"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -18,12 +19,6 @@ func (s *server) FileSystemCreateHandler(w http.ResponseWriter, r *http.Request)
 	vars := mux.Vars(r)
 	account := vars["account"]
 	group := vars["group"]
-	_, ok := s.efsServices[account]
-	if !ok {
-		log.Errorf("account not found: %s", account)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
 
 	req := FileSystemCreateRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -82,16 +77,31 @@ func (s *server) FileSystemListHandler(w http.ResponseWriter, r *http.Request) {
 func (s *server) FileSystemShowHandler(w http.ResponseWriter, r *http.Request) {
 	w = LogWriter{w}
 	vars := mux.Vars(r)
-	account := vars["account"]
+	account := s.mapAccountNumber(vars["account"])
 	group := vars["group"]
 	fs := vars["id"]
 
-	efsService, ok := s.efsServices[account]
-	if !ok {
-		log.Errorf("account not found: %s", account)
-		w.WriteHeader(http.StatusNotFound)
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
+	policy, err := generatePolicy("elasticfilesystem:*")
+	if err != nil {
+		log.Errorf("cannot generate policy for role: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	session, err := s.assumeRole(
+		r.Context(),
+		s.session.ExternalID,
+		role,
+		policy,
+	)
+	if err != nil {
+		log.Errorf("cannot assume role: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	efsService := yefs.New(yefs.WithSession(session.Session))
 
 	if exists, err := s.fileSystemExists(r.Context(), account, group, fs); err != nil {
 		handleError(w, err)
@@ -141,13 +151,13 @@ func (s *server) FileSystemShowHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	policy, err := filSystemAccessPolicyFromEfsPolicy(policyString)
+	fsPolicy, err := filSystemAccessPolicyFromEfsPolicy(policyString)
 	if err != nil {
 		handleError(w, err)
 		return
 	}
 
-	output := fileSystemResponseFromEFS(filesystem, mounttargets, accessPoints, policy, backup, transitionToIA, transitionToPrimary)
+	output := fileSystemResponseFromEFS(filesystem, mounttargets, accessPoints, fsPolicy, backup, transitionToIA, transitionToPrimary)
 	j, err := json.Marshal(output)
 	if err != nil {
 		log.Errorf("cannot marshal response (%v) into JSON: %s", output, err)
@@ -168,13 +178,6 @@ func (s *server) FileSystemDeleteHandler(w http.ResponseWriter, r *http.Request)
 	group := vars["group"]
 	fs := vars["id"]
 
-	_, ok := s.efsServices[account]
-	if !ok {
-		log.Errorf("account not found: %s", account)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
 	task, err := s.filesystemDelete(r.Context(), account, group, fs)
 	if err != nil {
 		handleError(w, err)
@@ -194,13 +197,6 @@ func (s *server) FileSystemUpdateHandler(w http.ResponseWriter, r *http.Request)
 	account := vars["account"]
 	group := vars["group"]
 	fs := vars["id"]
-
-	_, ok := s.efsServices[account]
-	if !ok {
-		log.Errorf("account not found: %s", account)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
 
 	if exists, err := s.fileSystemExists(r.Context(), account, group, fs); err != nil {
 		handleError(w, err)

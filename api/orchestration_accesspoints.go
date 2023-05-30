@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/YaleSpinup/apierror"
+	yefs "github.com/YaleSpinup/efs-api/efs"
 	"github.com/YaleSpinup/flywheel"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/efs"
@@ -13,10 +14,27 @@ import (
 )
 
 func (s server) accessPointCreate(ctx context.Context, account, group, fsid string, req *AccessPointCreateRequest) (*AccessPoint, *flywheel.Task, error) {
-	service, ok := s.efsServices[account]
-	if !ok {
-		return nil, nil, apierror.New(apierror.ErrNotFound, "account doesnt exist", nil)
+	acctNum := s.mapAccountNumber(account)
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+	policy, err := generatePolicy("elasticfilesystem:*")
+	if err != nil {
+		return nil, nil, apierror.New(apierror.ErrNotFound, "cannot generate policy", nil)
 	}
+
+	session, err := s.assumeRole(
+		ctx,
+		s.session.ExternalID,
+		role,
+		policy,
+	)
+	if err != nil {
+		return nil, nil, apierror.New(apierror.ErrNotFound, "failed to assume role in account", nil)
+	}
+
+	service := yefs.New(yefs.WithSession(session.Session))
+	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
+	yefs.WithDefaultSgs(s.efsServices[acctNum].DefaultSgs)
+	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
 
 	filesystem, err := service.GetFileSystem(ctx, fsid)
 	if err != nil {
@@ -107,10 +125,27 @@ func (s server) accessPointCreate(ctx context.Context, account, group, fsid stri
 }
 
 func (s *server) listFilesystemAccessPoints(ctx context.Context, account, group, fsid string) ([]string, error) {
-	service, ok := s.efsServices[account]
-	if !ok {
-		return nil, apierror.New(apierror.ErrNotFound, "account doesnt exist", nil)
+	acctNum := s.mapAccountNumber(account)
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+	policy, err := generatePolicy("elasticfilesystem:*")
+	if err != nil {
+		return nil, err
 	}
+
+	session, err := s.assumeRole(
+		ctx,
+		s.session.ExternalID,
+		role,
+		policy,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	service := yefs.New(yefs.WithSession(session.Session))
+	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
+	yefs.WithDefaultSgs(s.efsServices[acctNum].DefaultSgs)
+	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
 
 	out, err := service.ListAccessPoints(ctx, fsid)
 	if err != nil {
@@ -126,10 +161,27 @@ func (s *server) listFilesystemAccessPoints(ctx context.Context, account, group,
 }
 
 func (s *server) getFilesystemAccessPoint(ctx context.Context, account, group, fsid, apid string) (*AccessPoint, error) {
-	service, ok := s.efsServices[account]
-	if !ok {
-		return nil, apierror.New(apierror.ErrNotFound, "account doesnt exist", nil)
+	acctNum := s.mapAccountNumber(account)
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+	policy, err := generatePolicy("elasticfilesystem:*")
+	if err != nil {
+		return nil, err
 	}
+
+	session, err := s.assumeRole(
+		ctx,
+		s.session.ExternalID,
+		role,
+		policy,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	service := yefs.New(yefs.WithSession(session.Session))
+	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
+	yefs.WithDefaultSgs(s.efsServices[acctNum].DefaultSgs)
+	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
 
 	out, err := service.GetAccessPoint(ctx, apid)
 	if err != nil {
@@ -140,10 +192,27 @@ func (s *server) getFilesystemAccessPoint(ctx context.Context, account, group, f
 }
 
 func (s *server) deleteFilesystemAccessPoint(ctx context.Context, account, group, fsid, apid string) error {
-	service, ok := s.efsServices[account]
-	if !ok {
-		return apierror.New(apierror.ErrNotFound, "account doesnt exist", nil)
+	acctNum := s.mapAccountNumber(account)
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+	policy, err := generatePolicy("elasticfilesystem:*")
+	if err != nil {
+		return err
 	}
+
+	session, err := s.assumeRole(
+		ctx,
+		s.session.ExternalID,
+		role,
+		policy,
+	)
+	if err != nil {
+		return err
+	}
+
+	service := yefs.New(yefs.WithSession(session.Session))
+	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
+	yefs.WithDefaultSgs(s.efsServices[acctNum].DefaultSgs)
+	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
 
 	if err := service.DeleteAccessPoint(ctx, apid); err != nil {
 		return err

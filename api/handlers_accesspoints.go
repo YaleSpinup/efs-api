@@ -17,12 +17,6 @@ func (s *server) FileSystemAPCreateHandler(w http.ResponseWriter, r *http.Reques
 	group := vars["group"]
 	fsid := vars["id"]
 
-	if _, ok := s.efsServices[account]; !ok {
-		log.Errorf("account not found: %s", account)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
 	req := AccessPointCreateRequest{}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		msg := fmt.Sprintf("cannot decode body into create access point request input: %s", err)
@@ -56,12 +50,6 @@ func (s *server) FileSystemAPListHandler(w http.ResponseWriter, r *http.Request)
 	group := vars["group"]
 	fsid := vars["id"]
 
-	if _, ok := s.efsServices[account]; !ok {
-		log.Errorf("account not found: %s", account)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
 	out, err := s.listFilesystemAccessPoints(r.Context(), account, group, fsid)
 	if err != nil {
 		handleError(w, err)
@@ -88,12 +76,6 @@ func (s *server) FileSystemAPShowHandler(w http.ResponseWriter, r *http.Request)
 	fsid := vars["id"]
 	apid := vars["apid"]
 
-	if _, ok := s.efsServices[account]; !ok {
-		log.Errorf("account not found: %s", account)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
 	out, err := s.getFilesystemAccessPoint(r.Context(), account, group, fsid, apid)
 	if err != nil {
 		handleError(w, err)
@@ -119,12 +101,6 @@ func (s *server) FileSystemAPDeleteHandler(w http.ResponseWriter, r *http.Reques
 	group := vars["group"]
 	fsid := vars["id"]
 	apid := vars["apid"]
-
-	if _, ok := s.efsServices[account]; !ok {
-		log.Errorf("account not found: %s", account)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
 
 	if err := s.deleteFilesystemAccessPoint(r.Context(), account, group, fsid, apid); err != nil {
 		handleError(w, err)

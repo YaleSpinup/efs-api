@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/efs"
 
 	yiam "github.com/YaleSpinup/aws-go/services/iam"
+	yec2 "github.com/YaleSpinup/efs-api/ec2"
 	yefs "github.com/YaleSpinup/efs-api/efs"
 
 	log "github.com/sirupsen/logrus"
@@ -19,15 +20,32 @@ import (
 
 // filesystemCreate orchestrates the creation of an EFS filesystem and all related mount targets, policies, etc.
 func (s *server) filesystemCreate(ctx context.Context, account, group string, req *FileSystemCreateRequest) (*FileSystemResponse, *flywheel.Task, error) {
-	service, ok := s.efsServices[account]
-	if !ok {
-		return nil, nil, apierror.New(apierror.ErrNotFound, "account doesnt exist", nil)
+	acctNum := s.mapAccountNumber(account)
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+	policy, err := generatePolicy("elasticfilesystem:*")
+	if err != nil {
+		return nil, nil, apierror.New(apierror.ErrNotFound, "cannot generate policy", nil)
 	}
+
+	session, err := s.assumeRole(
+		ctx,
+		s.session.ExternalID,
+		role,
+		policy,
+	)
+	if err != nil {
+		return nil, nil, apierror.New(apierror.ErrNotFound, "failed to assume role in account", nil)
+	}
+
+	service := yefs.New(yefs.WithSession(session.Session))
+	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
+	yefs.WithDefaultSgs(s.efsServices[acctNum].DefaultSgs)
+	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
 
 	// TODO The following mapping of account numbers hould be updated once the filesystem orchestrations
 	// functions are moved to use account numbers (instead of aliases) and to use orchestrators instead
 	// of depending on the server struct.
-	acctNum := s.mapAccountNumber(account)
+	// acctNum := s.mapAccountNumber(account)
 
 	if req.Name == "" {
 		return nil, nil, apierror.New(apierror.ErrBadRequest, "Name is a required field", nil)
@@ -323,11 +341,23 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 	// functions are moved to use account numbers (instead of aliases) and to use orchestrators instead
 	// of depending on the server struct.
 	acctNum := s.mapAccountNumber(account)
-
-	service, ok := s.efsServices[account]
-	if !ok {
-		return nil, apierror.New(apierror.ErrNotFound, "account doesnt exist", nil)
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+	policy, err := generatePolicy("elasticfilesystem:*")
+	if err != nil {
+		return nil, err
 	}
+
+	session, err := s.assumeRole(
+		ctx,
+		s.session.ExternalID,
+		role,
+		policy,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	service := yefs.New(yefs.WithSession(session.Session))
 
 	filesystem, err := service.GetFileSystem(ctx, fs)
 	if err != nil {
@@ -487,10 +517,24 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 }
 
 func (s *server) filesystemDelete(ctx context.Context, account, group, fs string) (*flywheel.Task, error) {
-	service, ok := s.efsServices[account]
-	if !ok {
-		return nil, apierror.New(apierror.ErrNotFound, "account doesnt exist", nil)
+	acctNum := s.mapAccountNumber(account)
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+	policy, err := generatePolicy("elasticfilesystem:*")
+	if err != nil {
+		return nil, err
 	}
+
+	session, err := s.assumeRole(
+		ctx,
+		s.session.ExternalID,
+		role,
+		policy,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	service := yefs.New(yefs.WithSession(session.Session))
 
 	if exists, err := s.fileSystemExists(ctx, account, group, fs); err != nil {
 		return nil, apierror.New(apierror.ErrBadRequest, "", err)
@@ -700,10 +744,24 @@ func (s *server) startTask(ctx context.Context, task *flywheel.Task) (chan<- str
 func (s *server) subnetAzs(ctx context.Context, account string, defSubnets []string) (map[string]string, error) {
 	log.Infof("determining availability zone for account %s and subnets %+v", account, defSubnets)
 
-	ec2Service, ok := s.ec2Services[account]
-	if !ok {
-		return nil, apierror.New(apierror.ErrNotFound, "account doesnt exist", nil)
+	acctNum := s.mapAccountNumber(account)
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+	policy, err := generatePolicy("ec2:*")
+	if err != nil {
+		return nil, err
 	}
+
+	session, err := s.assumeRole(
+		ctx,
+		s.session.ExternalID,
+		role,
+		policy,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	ec2Service := yec2.New(yec2.WithSession(session.Session))
 
 	subnets := make(map[string]string)
 	for _, s := range defSubnets {
