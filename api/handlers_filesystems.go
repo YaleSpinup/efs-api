@@ -82,7 +82,7 @@ func (s *server) FileSystemShowHandler(w http.ResponseWriter, r *http.Request) {
 	fs := vars["id"]
 
 	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
-	policy, err := generatePolicy("elasticfilesystem:*")
+	policy, err := generatePolicy("elasticfilesystem:*", "kms:*")
 	if err != nil {
 		log.Errorf("cannot generate policy for role: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)

@@ -22,7 +22,7 @@ import (
 func (s *server) filesystemCreate(ctx context.Context, account, group string, req *FileSystemCreateRequest) (*FileSystemResponse, *flywheel.Task, error) {
 	acctNum := s.mapAccountNumber(account)
 	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
-	policy, err := generatePolicy("elasticfilesystem:*")
+	policy, err := generatePolicy("elasticfilesystem:*", "kms:*")
 	if err != nil {
 		return nil, nil, apierror.New(apierror.ErrNotFound, "cannot generate policy", nil)
 	}
@@ -37,10 +37,10 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 		return nil, nil, apierror.New(apierror.ErrNotFound, "failed to assume role in account", nil)
 	}
 
-	service := yefs.New(yefs.WithSession(session.Session))
-	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
-	yefs.WithDefaultSgs(s.efsServices[acctNum].DefaultSgs)
-	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
+	service := yefs.New(yefs.WithSession(session.Session),
+		yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId),
+		yefs.WithDefaultSgs(s.efsServices[acctNum].DefaultSgs),
+		yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId))
 
 	// TODO The following mapping of account numbers hould be updated once the filesystem orchestrations
 	// functions are moved to use account numbers (instead of aliases) and to use orchestrators instead
@@ -342,7 +342,7 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 	// of depending on the server struct.
 	acctNum := s.mapAccountNumber(account)
 	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
-	policy, err := generatePolicy("elasticfilesystem:*")
+	policy, err := generatePolicy("elasticfilesystem:*", "kms:*")
 	if err != nil {
 		return nil, err
 	}
@@ -519,7 +519,7 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 func (s *server) filesystemDelete(ctx context.Context, account, group, fs string) (*flywheel.Task, error) {
 	acctNum := s.mapAccountNumber(account)
 	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
-	policy, err := generatePolicy("elasticfilesystem:*")
+	policy, err := generatePolicy("elasticfilesystem:*", "kms:*")
 	if err != nil {
 		return nil, err
 	}

@@ -16,7 +16,7 @@ import (
 func (s server) accessPointCreate(ctx context.Context, account, group, fsid string, req *AccessPointCreateRequest) (*AccessPoint, *flywheel.Task, error) {
 	acctNum := s.mapAccountNumber(account)
 	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
-	policy, err := generatePolicy("elasticfilesystem:*")
+	policy, err := generatePolicy("elasticfilesystem:*", "kms:*")
 	if err != nil {
 		return nil, nil, apierror.New(apierror.ErrNotFound, "cannot generate policy", nil)
 	}
@@ -127,7 +127,7 @@ func (s server) accessPointCreate(ctx context.Context, account, group, fsid stri
 func (s *server) listFilesystemAccessPoints(ctx context.Context, account, group, fsid string) ([]string, error) {
 	acctNum := s.mapAccountNumber(account)
 	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
-	policy, err := generatePolicy("elasticfilesystem:*")
+	policy, err := generatePolicy("elasticfilesystem:*", "kms:*")
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (s *server) listFilesystemAccessPoints(ctx context.Context, account, group,
 func (s *server) getFilesystemAccessPoint(ctx context.Context, account, group, fsid, apid string) (*AccessPoint, error) {
 	acctNum := s.mapAccountNumber(account)
 	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
-	policy, err := generatePolicy("elasticfilesystem:*")
+	policy, err := generatePolicy("elasticfilesystem:*", "kms:*")
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func (s *server) getFilesystemAccessPoint(ctx context.Context, account, group, f
 func (s *server) deleteFilesystemAccessPoint(ctx context.Context, account, group, fsid, apid string) error {
 	acctNum := s.mapAccountNumber(account)
 	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
-	policy, err := generatePolicy("elasticfilesystem:*")
+	policy, err := generatePolicy("elasticfilesystem:*", "kms:*")
 	if err != nil {
 		return err
 	}
