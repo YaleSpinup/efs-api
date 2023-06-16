@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/YaleSpinup/apierror"
 	"github.com/YaleSpinup/efs-api/resourcegroupstaggingapi"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/arn"
@@ -342,10 +341,29 @@ func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTa
 
 // listFileSystems returns a list of elasticfilesystems with the given org tag and the group/spaceid tag
 func (s *server) listFileSystems(ctx context.Context, account, group string) ([]string, error) {
-	rgtService, ok := s.rgTaggingAPIServices[account]
-	if !ok {
-		return nil, apierror.New(apierror.ErrNotFound, "account not found", nil)
+	acctNum := s.mapAccountNumber(account)
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+	policy, err := generatePolicy("tag:*")
+	if err != nil {
+		return nil, err
 	}
+
+	session, err := s.assumeRole(
+		ctx,
+		s.session.ExternalID,
+		role,
+		policy,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	rgtService := resourcegroupstaggingapi.New(resourcegroupstaggingapi.WithSession(session.Session))
+
+	// rgtService, ok := s.rgTaggingAPIServices[account]
+	// if !ok {
+	// 	return nil, apierror.New(apierror.ErrNotFound, "account not found", nil)
+	// }
 
 	// build up tag filters starting with the org
 	tagFilters := []*resourcegroupstaggingapi.TagFilter{
