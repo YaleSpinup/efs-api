@@ -38,9 +38,9 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 	}
 
 	service := yefs.New(yefs.WithSession(session.Session),
-		yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId),
-		yefs.WithDefaultSgs(s.efsServices[acctNum].DefaultSgs),
-		yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId))
+		yefs.WithDefaultKMSKeyId(s.efsServices[account].DefaultKmsKeyId),
+		yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs),
+		yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets))
 
 	// TODO The following mapping of account numbers hould be updated once the filesystem orchestrations
 	// functions are moved to use account numbers (instead of aliases) and to use orchestrators instead
