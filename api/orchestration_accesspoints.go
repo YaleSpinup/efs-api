@@ -32,9 +32,9 @@ func (s server) accessPointCreate(ctx context.Context, account, group, fsid stri
 	}
 
 	service := yefs.New(yefs.WithSession(session.Session))
-	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
-	yefs.WithDefaultSgs(s.efsServices[acctNum].DefaultSgs)
-	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
+	yefs.WithDefaultKMSKeyId(s.efsServices[account].DefaultKmsKeyId)
+	yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs)
+	yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets)
 
 	filesystem, err := service.GetFileSystem(ctx, fsid)
 	if err != nil {
@@ -143,9 +143,9 @@ func (s *server) listFilesystemAccessPoints(ctx context.Context, account, group,
 	}
 
 	service := yefs.New(yefs.WithSession(session.Session))
-	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
-	yefs.WithDefaultSgs(s.efsServices[acctNum].DefaultSgs)
-	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
+	yefs.WithDefaultKMSKeyId(s.efsServices[account].DefaultKmsKeyId)
+	yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs)
+	yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets)
 
 	out, err := service.ListAccessPoints(ctx, fsid)
 	if err != nil {
@@ -179,9 +179,9 @@ func (s *server) getFilesystemAccessPoint(ctx context.Context, account, group, f
 	}
 
 	service := yefs.New(yefs.WithSession(session.Session))
-	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
-	yefs.WithDefaultSgs(s.efsServices[acctNum].DefaultSgs)
-	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
+	yefs.WithDefaultKMSKeyId(s.efsServices[account].DefaultKmsKeyId)
+	yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs)
+	yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets)
 
 	out, err := service.GetAccessPoint(ctx, apid)
 	if err != nil {
@@ -210,9 +210,9 @@ func (s *server) deleteFilesystemAccessPoint(ctx context.Context, account, group
 	}
 
 	service := yefs.New(yefs.WithSession(session.Session))
-	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
-	yefs.WithDefaultSgs(s.efsServices[acctNum].DefaultSgs)
-	yefs.WithDefaultKMSKeyId(s.efsServices[acctNum].DefaultKmsKeyId)
+	yefs.WithDefaultKMSKeyId(s.efsServices[account].DefaultKmsKeyId)
+	yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs)
+	yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets)
 
 	if err := service.DeleteAccessPoint(ctx, apid); err != nil {
 		return err
