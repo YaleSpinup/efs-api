@@ -25,6 +25,10 @@
       "defaultKmsKeyId": "{{ .spinupsec_default_kms_key_id }}"
     }
   },
+  "defaultKmsKeyAlias":{
+    "spinup": "alias/spinup-ecs-api-dev",
+    "spinupsec": "alias/spinup-ecs-api-dev"
+  },
   "accountsMap": {
     "spinup": "{{ .spinup_account_number }}",
     "spinupsec": "{{ .spinupsec_account_number }}"
