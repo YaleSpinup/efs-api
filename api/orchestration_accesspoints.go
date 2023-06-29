@@ -7,6 +7,7 @@ import (
 
 	"github.com/YaleSpinup/apierror"
 	yefs "github.com/YaleSpinup/efs-api/efs"
+	ykms "github.com/YaleSpinup/efs-api/kms"
 	"github.com/YaleSpinup/flywheel"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/efs"
@@ -31,10 +32,16 @@ func (s server) accessPointCreate(ctx context.Context, account, group, fsid stri
 		return nil, nil, apierror.New(apierror.ErrNotFound, "failed to assume role in account", nil)
 	}
 
-	service := yefs.New(yefs.WithSession(session.Session))
-	yefs.WithDefaultKMSKeyId(s.efsServices[account].DefaultKmsKeyId)
-	yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs)
-	yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets)
+	kmsService := ykms.New(ykms.WithSession(session.Session))
+	defaultKmsKey, err := kmsService.GetKmsKeyId(ctx, s.getKMSKeyAlias(account))
+	if err != nil {
+		return nil, nil, apierror.New(apierror.ErrInternalError, "failed to get KMS Key", nil)
+	}
+
+	service := yefs.New(yefs.WithSession(session.Session),
+		yefs.WithDefaultKMSKeyId(acctNum, defaultKmsKey),
+		yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs),
+		yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets))
 
 	filesystem, err := service.GetFileSystem(ctx, fsid)
 	if err != nil {
@@ -142,10 +149,16 @@ func (s *server) listFilesystemAccessPoints(ctx context.Context, account, group,
 		return nil, err
 	}
 
-	service := yefs.New(yefs.WithSession(session.Session))
-	yefs.WithDefaultKMSKeyId(s.efsServices[account].DefaultKmsKeyId)
-	yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs)
-	yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets)
+	kmsService := ykms.New(ykms.WithSession(session.Session))
+	defaultKmsKey, err := kmsService.GetKmsKeyId(ctx, s.getKMSKeyAlias(account))
+	if err != nil {
+		return nil, apierror.New(apierror.ErrInternalError, "failed to get KMS Key", nil)
+	}
+
+	service := yefs.New(yefs.WithSession(session.Session),
+		yefs.WithDefaultKMSKeyId(acctNum, defaultKmsKey),
+		yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs),
+		yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets))
 
 	out, err := service.ListAccessPoints(ctx, fsid)
 	if err != nil {
@@ -178,10 +191,16 @@ func (s *server) getFilesystemAccessPoint(ctx context.Context, account, group, f
 		return nil, err
 	}
 
-	service := yefs.New(yefs.WithSession(session.Session))
-	yefs.WithDefaultKMSKeyId(s.efsServices[account].DefaultKmsKeyId)
-	yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs)
-	yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets)
+	kmsService := ykms.New(ykms.WithSession(session.Session))
+	defaultKmsKey, err := kmsService.GetKmsKeyId(ctx, s.getKMSKeyAlias(account))
+	if err != nil {
+		return nil, apierror.New(apierror.ErrInternalError, "failed to get KMS Key", nil)
+	}
+
+	service := yefs.New(yefs.WithSession(session.Session),
+		yefs.WithDefaultKMSKeyId(acctNum, defaultKmsKey),
+		yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs),
+		yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets))
 
 	out, err := service.GetAccessPoint(ctx, apid)
 	if err != nil {
@@ -209,10 +228,16 @@ func (s *server) deleteFilesystemAccessPoint(ctx context.Context, account, group
 		return err
 	}
 
-	service := yefs.New(yefs.WithSession(session.Session))
-	yefs.WithDefaultKMSKeyId(s.efsServices[account].DefaultKmsKeyId)
-	yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs)
-	yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets)
+	kmsService := ykms.New(ykms.WithSession(session.Session))
+	defaultKmsKey, err := kmsService.GetKmsKeyId(ctx, s.getKMSKeyAlias(account))
+	if err != nil {
+		return apierror.New(apierror.ErrInternalError, "failed to get KMS Key", nil)
+	}
+
+	service := yefs.New(yefs.WithSession(session.Session),
+		yefs.WithDefaultKMSKeyId(acctNum, defaultKmsKey),
+		yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs),
+		yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets))
 
 	if err := service.DeleteAccessPoint(ctx, apid); err != nil {
 		return err
