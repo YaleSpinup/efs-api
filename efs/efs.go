@@ -1,6 +1,8 @@
 package efs
 
 import (
+	"fmt"
+
 	"github.com/YaleSpinup/efs-api/common"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -72,10 +74,10 @@ func WithCredentials(key, secret, token, region string) EFSOption {
 	}
 }
 
-func WithDefaultKMSKeyId(keyId string) EFSOption {
+func WithDefaultKMSKeyId(accountNumber, keyId string) EFSOption {
 	return func(e *EFS) {
 		log.Debugf("using default kms keyid %s", keyId)
-		e.DefaultKmsKeyId = keyId
+		e.DefaultKmsKeyId = fmt.Sprintf("arn:aws:kms:%s:%s:key/%s", *e.session.Config.Region, accountNumber, keyId)
 	}
 }
 

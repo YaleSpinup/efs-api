@@ -14,6 +14,7 @@ import (
 	yiam "github.com/YaleSpinup/aws-go/services/iam"
 	yec2 "github.com/YaleSpinup/efs-api/ec2"
 	yefs "github.com/YaleSpinup/efs-api/efs"
+	ykms "github.com/YaleSpinup/efs-api/kms"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -37,8 +38,14 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 		return nil, nil, apierror.New(apierror.ErrNotFound, "failed to assume role in account", nil)
 	}
 
+	kmsService := ykms.New(ykms.WithSession(session.Session))
+	defaultKmsKey, err := kmsService.GetKmsKeyId(ctx, s.getKMSKeyAlias(account))
+	if err != nil {
+		return nil, nil, apierror.New(apierror.ErrInternalError, "failed to get KMS Key", nil)
+	}
+
 	service := yefs.New(yefs.WithSession(session.Session),
-		yefs.WithDefaultKMSKeyId(s.efsServices[account].DefaultKmsKeyId),
+		yefs.WithDefaultKMSKeyId(acctNum, defaultKmsKey),
 		yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs),
 		yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets))
 

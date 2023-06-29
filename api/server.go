@@ -50,6 +50,7 @@ type server struct {
 	context              context.Context
 	ec2Services          map[string]ec2.EC2
 	efsServices          map[string]efs.EFS
+	defaultKmsKeyAlias   map[string]string
 	flywheel             *flywheel.Manager
 	org                  string
 	orgPolicy            string
@@ -74,6 +75,7 @@ func NewServer(config common.Config) error {
 		accountsMap:          config.AccountsMap,
 		ec2Services:          make(map[string]ec2.EC2),
 		efsServices:          make(map[string]efs.EFS),
+		defaultKmsKeyAlias:   config.DefaultKmsKeyAlias,
 		rgTaggingAPIServices: make(map[string]resourcegroupstaggingapi.ResourceGroupsTaggingAPI),
 		router:               mux.NewRouter(),
 		version:              config.Version,
@@ -257,6 +259,13 @@ func retry(attempts int, sleep time.Duration, f func() error) error {
 // if we have an entry for the account name, return the associated account number
 func (s *server) mapAccountNumber(name string) string {
 	if a, ok := s.accountsMap[name]; ok {
+		return a
+	}
+	return name
+}
+
+func (s *server) getKMSKeyAlias(name string) string {
+	if a, ok := s.defaultKmsKeyAlias[name]; ok {
 		return a
 	}
 	return name
