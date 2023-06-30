@@ -48,13 +48,13 @@ func init() {
 type server struct {
 	accountsMap          map[string]string
 	context              context.Context
-	ec2Services          map[string]ec2.EC2
-	efsServices          map[string]efs.EFS
-	defaultKmsKeyAlias   map[string]string
+	ec2Services          ec2.EC2
+	efsServices          efs.EFS
+	kmsKeyTags           []string
 	flywheel             *flywheel.Manager
 	org                  string
 	orgPolicy            string
-	rgTaggingAPIServices map[string]resourcegroupstaggingapi.ResourceGroupsTaggingAPI
+	rgTaggingAPIServices resourcegroupstaggingapi.ResourceGroupsTaggingAPI
 	router               *mux.Router
 	session              session.Session
 	sessionCache         *cache.Cache
@@ -73,10 +73,10 @@ func NewServer(config common.Config) error {
 
 	s := server{
 		accountsMap:          config.AccountsMap,
-		ec2Services:          make(map[string]ec2.EC2),
-		efsServices:          make(map[string]efs.EFS),
-		defaultKmsKeyAlias:   config.DefaultKmsKeyAlias,
-		rgTaggingAPIServices: make(map[string]resourcegroupstaggingapi.ResourceGroupsTaggingAPI),
+		ec2Services:          ec2.EC2{},
+		efsServices:          efs.EFS{},
+		kmsKeyTags:           config.KmsKeyTags,
+		rgTaggingAPIServices: resourcegroupstaggingapi.ResourceGroupsTaggingAPI{},
 		router:               mux.NewRouter(),
 		version:              config.Version,
 		context:              ctx,
@@ -89,14 +89,6 @@ func NewServer(config common.Config) error {
 		return err
 	}
 	s.orgPolicy = orgPolicy
-
-	// Create shared sessions
-	for name, c := range config.Accounts {
-		log.Infof("creating new efs-api service for account '%s' with key '%s' in region '%s' (org: %s)", name, c.Akid, c.Region, s.org)
-		s.ec2Services[name] = ec2.NewSession(c)
-		s.efsServices[name] = efs.NewSession(c)
-		s.rgTaggingAPIServices[name] = resourcegroupstaggingapi.NewSession(c)
-	}
 
 	// Create a new session used for authentication and assuming cross account roles
 	log.Debugf("Creating new session with key '%s' in region '%s'", config.Account.Akid, config.Account.Region)
@@ -259,13 +251,6 @@ func retry(attempts int, sleep time.Duration, f func() error) error {
 // if we have an entry for the account name, return the associated account number
 func (s *server) mapAccountNumber(name string) string {
 	if a, ok := s.accountsMap[name]; ok {
-		return a
-	}
-	return name
-}
-
-func (s *server) getKMSKeyAlias(name string) string {
-	if a, ok := s.defaultKmsKeyAlias[name]; ok {
 		return a
 	}
 	return name

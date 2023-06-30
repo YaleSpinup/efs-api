@@ -66,7 +66,7 @@ func (s *server) UsersCreateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := orch.createFilesystemUser(r.Context(), account, group, fsid, &req)
+	out, err := orch.createFilesystemUser(r.Context(), group, fsid, &req)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -81,7 +81,11 @@ func (s *server) UsersCreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(j)
+
+	_, err = w.Write(j)
+	if err != nil {
+		handleError(w, apierror.New(apierror.ErrInternalError, "error writing response", err))
+	}
 }
 
 // UsersDeleteHandler handles user deletion requests
@@ -120,14 +124,18 @@ func (s *server) UsersDeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	orch := newUserOrchestrator(iamService, efsService, s.org)
 
-	if err := orch.deleteFilesystemUser(r.Context(), account, group, fsid, user); err != nil {
+	if err := orch.deleteFilesystemUser(r.Context(), group, fsid, user); err != nil {
 		handleError(w, err)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+
+	_, err = w.Write([]byte("OK"))
+	if err != nil {
+		handleError(w, apierror.New(apierror.ErrInternalError, "error writing response", err))
+	}
 }
 
 // UsersListHandler handles requests to list users in a space
@@ -160,7 +168,7 @@ func (s *server) UsersListHandler(w http.ResponseWriter, r *http.Request) {
 
 	orch := newUserOrchestrator(iamService, efsService, s.org)
 
-	out, err := orch.listFilesystemUsers(r.Context(), account, group, fsid)
+	out, err := orch.listFilesystemUsers(r.Context(), group, fsid)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -175,7 +183,11 @@ func (s *server) UsersListHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(j)
+
+	_, err = w.Write(j)
+	if err != nil {
+		handleError(w, apierror.New(apierror.ErrInternalError, "error writing response", err))
+	}
 }
 
 // UsersShowHandler handles requests to show a user
@@ -209,7 +221,7 @@ func (s *server) UsersShowHandler(w http.ResponseWriter, r *http.Request) {
 
 	orch := newUserOrchestrator(iamService, efsService, s.org)
 
-	out, err := orch.getFilesystemUser(r.Context(), account, group, fsid, user)
+	out, err := orch.getFilesystemUser(r.Context(), group, fsid, user)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -224,7 +236,11 @@ func (s *server) UsersShowHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(j)
+
+	_, err = w.Write(j)
+	if err != nil {
+		handleError(w, apierror.New(apierror.ErrInternalError, "error writing response", err))
+	}
 }
 
 // UsersUpdateHandler updates a filesystem user
@@ -269,7 +285,7 @@ func (s *server) UsersUpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 	orch := newUserOrchestrator(iamService, efsService, s.org)
 
-	resp, err := orch.updateFilesystemUser(r.Context(), account, group, fsid, userName, &req)
+	resp, err := orch.updateFilesystemUser(r.Context(), group, fsid, userName, &req)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -283,5 +299,9 @@ func (s *server) UsersUpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(j)
+
+	_, err = w.Write(j)
+	if err != nil {
+		handleError(w, apierror.New(apierror.ErrInternalError, "error writing response", err))
+	}
 }

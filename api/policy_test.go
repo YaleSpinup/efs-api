@@ -226,7 +226,7 @@ func Test_efsPolicyFromFileSystemAccessPolicy(t *testing.T) {
 						Sid:    "AllowECSAccessFromHomeSpace",
 						Effect: "Allow",
 						Principal: iam.Principal{
-							"AWS": []string{"arn:aws:iam::1234567890:role/mygroup-ecsTaskExecution"},
+							"AWS": []string{"*"},
 						},
 						Action: []string{
 							"elasticfilesystem:ClientRootAccess",

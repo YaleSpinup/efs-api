@@ -2,6 +2,8 @@ package kms
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/YaleSpinup/apierror"
 	"github.com/YaleSpinup/efs-api/common"
@@ -36,13 +38,77 @@ func NewSession(account common.Account) KMS {
 	return s
 }
 
+// hasInputTags given a search value check an array of keys for a match
+func (k *KMS) hasInputTags(search string, keys []string) bool {
+	for _, key := range keys {
+		if key == search {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (k *KMS) GetKmsKeyIdByTags(ctx context.Context, inputTags []string, org string) (string, error) {
+	if len(inputTags) == 0 {
+		return "", apierror.New(apierror.ErrBadRequest, "empty kms key input tags", nil)
+	}
+
+	log.Info("retrieving list of keys to check for tags")
+
+	output, err := k.Service.ListKeysWithContext(ctx, &kms.ListKeysInput{})
+	if err != nil {
+		return "", err
+	}
+
+	log.Infof("retrieved %d keys", len(output.Keys))
+	log.Infof("searching for kms keys matching the tags %v", inputTags)
+
+	var targetKeyId string
+	for _, key := range output.Keys {
+		keyId := aws.StringValue(key.KeyId)
+		tags, err := k.Service.ListResourceTagsWithContext(ctx, &kms.ListResourceTagsInput{KeyId: key.KeyId})
+		if err != nil {
+			return "", err
+		}
+
+		var foundKeys []string
+		for _, tag := range tags.Tags {
+			tagKey := aws.StringValue(tag.TagKey)
+			tagValue := aws.StringValue(tag.TagValue)
+
+			if k.hasInputTags(tagKey, inputTags) {
+				keyValueEnd := strings.Split(tagKey, ":")[2]
+
+				if keyValueEnd != "org" || keyValueEnd == "org" && tagValue == org {
+					foundKeys = append(foundKeys, tagKey)
+				}
+
+				if len(foundKeys) == len(inputTags) {
+					targetKeyId = keyId
+				}
+			}
+		}
+	}
+
+	if targetKeyId == "" {
+		return "", apierror.New(
+			apierror.ErrNotFound,
+			fmt.Sprintf("cannot find kms key with tag key %s", inputTags),
+			nil,
+		)
+	}
+
+	return targetKeyId, nil
+}
+
 func (k *KMS) GetKmsKeyId(ctx context.Context, aliasName string) (string, error) {
 	if aliasName == "" {
-		return "", apierror.New(apierror.ErrBadRequest, "invalid input", nil)
+		return "", apierror.New(apierror.ErrBadRequest, "empty alias input", nil)
 	}
 
 	input := &kms.ListAliasesInput{}
-	output, err := k.Service.ListAliases(input)
+	output, err := k.Service.ListAliasesWithContext(ctx, input)
 	if err != nil {
 		return "", err
 	}

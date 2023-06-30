@@ -17,7 +17,7 @@ import (
 func (s *server) FileSystemCreateHandler(w http.ResponseWriter, r *http.Request) {
 	w = LogWriter{w}
 	vars := mux.Vars(r)
-	account := vars["account"]
+	account := s.mapAccountNumber(vars["account"])
 	group := vars["group"]
 
 	req := FileSystemCreateRequest{}
@@ -44,17 +44,84 @@ func (s *server) FileSystemCreateHandler(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("X-Flywheel-Task", task.ID)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
-	w.Write(j)
+
+	_, err = w.Write(j)
+	if err != nil {
+		handleError(w, apierror.New(apierror.ErrInternalError, "error writing response", err))
+	}
 }
 
-// FileSystemListHandler lists all of the filesystems in a group by id
+// FileSystemUpdateHandler updates a filesystem by id
+func (s *server) FileSystemUpdateHandler(w http.ResponseWriter, r *http.Request) {
+	w = LogWriter{w}
+	vars := mux.Vars(r)
+	account := s.mapAccountNumber(vars["account"])
+	group := vars["group"]
+	fs := vars["id"]
+
+	if exists, err := s.fileSystemExists(r.Context(), account, group, fs); err != nil {
+		handleError(w, err)
+	} else if !exists {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	req := FileSystemUpdateRequest{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		msg := fmt.Sprintf("cannot decode body into update filesystem input: %s", err)
+		handleError(w, apierror.New(apierror.ErrBadRequest, msg, err))
+		return
+	}
+
+	task, err := s.filesystemUpdate(r.Context(), account, group, fs, &req)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+
+	w.Header().Set("X-Flywheel-Task", task.ID)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+
+	_, err = w.Write([]byte("OK"))
+	if err != nil {
+		handleError(w, apierror.New(apierror.ErrInternalError, "error writing response", err))
+	}
+}
+
+// FileSystemDeleteHandler deletes a filesystem by id
+func (s *server) FileSystemDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	w = LogWriter{w}
+	vars := mux.Vars(r)
+	account := s.mapAccountNumber(vars["account"])
+	group := vars["group"]
+	fs := vars["id"]
+
+	task, err := s.filesystemDelete(r.Context(), account, group, fs)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+
+	w.Header().Set("X-Flywheel-Task", task.ID)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+
+	_, err = w.Write([]byte("OK"))
+	if err != nil {
+		handleError(w, apierror.New(apierror.ErrInternalError, "error writing response", err))
+	}
+}
+
+// FileSystemListHandler lists all the filesystems in a group by id
 func (s *server) FileSystemListHandler(w http.ResponseWriter, r *http.Request) {
 	w = LogWriter{w}
 	vars := mux.Vars(r)
-	account := vars["account"]
+	account := s.mapAccountNumber(vars["account"])
 	group := vars["group"]
 
-	out, err := s.listFileSystems(r.Context(), account, group)
+	out, err := s.filesystemList(r.Context(), account, group)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -70,7 +137,11 @@ func (s *server) FileSystemListHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(j)
+
+	_, err = w.Write(j)
+	if err != nil {
+		handleError(w, apierror.New(apierror.ErrInternalError, "error writing response", err))
+	}
 }
 
 // FileSystemShowHandler gets the details if a filesystem by id
@@ -167,60 +238,9 @@ func (s *server) FileSystemShowHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(j)
-}
 
-// FileSystemDeleteHandler deletes a filesystem by id
-func (s *server) FileSystemDeleteHandler(w http.ResponseWriter, r *http.Request) {
-	w = LogWriter{w}
-	vars := mux.Vars(r)
-	account := vars["account"]
-	group := vars["group"]
-	fs := vars["id"]
-
-	task, err := s.filesystemDelete(r.Context(), account, group, fs)
+	_, err = w.Write(j)
 	if err != nil {
-		handleError(w, err)
-		return
+		handleError(w, apierror.New(apierror.ErrInternalError, "error writing response", err))
 	}
-
-	w.Header().Set("X-Flywheel-Task", task.ID)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	w.Write([]byte("OK"))
-}
-
-// FileSystemUpdateHandler updates a filesystem by id
-func (s *server) FileSystemUpdateHandler(w http.ResponseWriter, r *http.Request) {
-	w = LogWriter{w}
-	vars := mux.Vars(r)
-	account := vars["account"]
-	group := vars["group"]
-	fs := vars["id"]
-
-	if exists, err := s.fileSystemExists(r.Context(), account, group, fs); err != nil {
-		handleError(w, err)
-	} else if !exists {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	req := FileSystemUpdateRequest{}
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		msg := fmt.Sprintf("cannot decode body into update filesystem input: %s", err)
-		handleError(w, apierror.New(apierror.ErrBadRequest, msg, err))
-		return
-	}
-
-	task, err := s.filesystemUpdate(r.Context(), account, group, fs, &req)
-	if err != nil {
-		handleError(w, err)
-		return
-	}
-
-	w.Header().Set("X-Flywheel-Task", task.ID)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	w.Write([]byte("OK"))
 }

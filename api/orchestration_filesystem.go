@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws/arn"
+	"strings"
 	"time"
 
 	"github.com/YaleSpinup/apierror"
+	"github.com/YaleSpinup/efs-api/resourcegroupstaggingapi"
 	"github.com/YaleSpinup/flywheel"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/efs"
@@ -21,8 +24,7 @@ import (
 
 // filesystemCreate orchestrates the creation of an EFS filesystem and all related mount targets, policies, etc.
 func (s *server) filesystemCreate(ctx context.Context, account, group string, req *FileSystemCreateRequest) (*FileSystemResponse, *flywheel.Task, error) {
-	acctNum := s.mapAccountNumber(account)
-	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
 	policy, err := generatePolicy("elasticfilesystem:*", "kms:*")
 	if err != nil {
 		return nil, nil, apierror.New(apierror.ErrNotFound, "cannot generate policy", nil)
@@ -39,20 +41,14 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 	}
 
 	kmsService := ykms.New(ykms.WithSession(session.Session))
-	defaultKmsKey, err := kmsService.GetKmsKeyId(ctx, s.getKMSKeyAlias(account))
-	if err != nil {
-		return nil, nil, apierror.New(apierror.ErrInternalError, "failed to get KMS Key", nil)
-	}
+	kmsKeyId, err := kmsService.GetKmsKeyIdByTags(ctx, s.kmsKeyTags, s.org)
+
+	log.Printf("KMS Key: %s", kmsKeyId)
 
 	service := yefs.New(yefs.WithSession(session.Session),
-		yefs.WithDefaultKMSKeyId(acctNum, defaultKmsKey),
-		yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs),
-		yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets))
-
-	// TODO The following mapping of account numbers hould be updated once the filesystem orchestrations
-	// functions are moved to use account numbers (instead of aliases) and to use orchestrators instead
-	// of depending on the server struct.
-	// acctNum := s.mapAccountNumber(account)
+		yefs.WithDefaultKMSKeyId(account, kmsKeyId),
+		yefs.WithDefaultSgs(req.Sgs),
+		yefs.WithDefaultSubnets(req.Subnets))
 
 	if req.Name == "" {
 		return nil, nil, apierror.New(apierror.ErrBadRequest, "Name is a required field", nil)
@@ -63,7 +59,7 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 
 	// override encryption key if one was passed
 	if req.KmsKeyId == "" {
-		req.KmsKeyId = service.DefaultKmsKeyId
+		req.KmsKeyId = kmsKeyId
 	}
 
 	// validate lifecycle configuration setting
@@ -134,7 +130,7 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 		req.Subnets = []string{subnet}
 	}
 
-	// create the filessystem
+	// create the filesystem
 	filesystem, err := service.CreateFileSystem(ctx, &input)
 	if err != nil {
 		return nil, nil, err
@@ -208,7 +204,7 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 			msgChan <- fmt.Sprintf("setting filesystem %s access policy to %+v", fsid, req.AccessPolicy)
 
 			var policy []byte
-			policy, err = json.Marshal(efsPolicyFromFileSystemAccessPolicy(acctNum, group, aws.StringValue(filesystem.FileSystemArn), req.AccessPolicy))
+			policy, err = json.Marshal(efsPolicyFromFileSystemAccessPolicy(account, group, aws.StringValue(filesystem.FileSystemArn), req.AccessPolicy))
 			if err != nil {
 				errChan <- fmt.Errorf("failed to marshall access policy for filesystem %s: %s", fsid, err.Error())
 				return
@@ -305,7 +301,7 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 
 			var ap *AccessPoint
 			var apTask *flywheel.Task
-			ap, apTask, err = s.accessPointCreate(fsCtx, account, group, fsid, apReq)
+			ap, apTask, err = s.accessPointCreate(fsCtx, account, fsid, apReq)
 			if err != nil {
 				errChan <- err
 				return
@@ -344,11 +340,7 @@ func (s *server) filesystemCreate(ctx context.Context, account, group string, re
 }
 
 func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string, req *FileSystemUpdateRequest) (*flywheel.Task, error) {
-	// TODO The following mapping of account numbers hould be updated once the filesystem orchestrations
-	// functions are moved to use account numbers (instead of aliases) and to use orchestrators instead
-	// of depending on the server struct.
-	acctNum := s.mapAccountNumber(account)
-	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
 	policy, err := generatePolicy("elasticfilesystem:*", "kms:*")
 	if err != nil {
 		return nil, err
@@ -458,7 +450,7 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 		if req.AccessPolicy != nil {
 			msgChan <- fmt.Sprintf("setting filesystem %s access policy to %+v", fsid, req.AccessPolicy)
 
-			policy := efsPolicyFromFileSystemAccessPolicy(acctNum, group, aws.StringValue(filesystem.FileSystemArn), req.AccessPolicy)
+			policy := efsPolicyFromFileSystemAccessPolicy(account, group, aws.StringValue(filesystem.FileSystemArn), req.AccessPolicy)
 			var policyDoc []byte
 			policyDoc, err = json.Marshal(policy)
 			if err != nil {
@@ -481,10 +473,7 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 				return
 			}
 
-			// TODO The following assumerole code should be updated
-			// once the filesystem orchestrations functions are moved to use account numbers (instead of
-			// aliases) and to use orchestrators instead of depending on the server struct.
-			role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+			role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
 
 			// IAM doesn't support resource tags, so we can't pass the s.orgPolicy here
 			session, err := s.assumeRole(
@@ -504,14 +493,14 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 
 			orch := newUserOrchestrator(iamService, efsService, s.org)
 
-			users, err := orch.listFilesystemUsers(fsCtx, acctNum, group, fsid)
+			users, err := orch.listFilesystemUsers(fsCtx, group, fsid)
 			if err != nil {
 				errChan <- fmt.Errorf("failed to list users filesystem %s: %s", fsid, err.Error())
 				return
 			}
 
 			for _, u := range users {
-				if err := s.updateTagsForUser(fsCtx, acctNum, group, fsid, u, req.Tags); err != nil {
+				if err := s.updateTagsForUser(fsCtx, account, group, fsid, u, req.Tags); err != nil {
 					errChan <- fmt.Errorf("failed to update tags for users of filesystem %s: %s", fsid, err.Error())
 					return
 				}
@@ -524,8 +513,7 @@ func (s *server) filesystemUpdate(ctx context.Context, account, group, fs string
 }
 
 func (s *server) filesystemDelete(ctx context.Context, account, group, fs string) (*flywheel.Task, error) {
-	acctNum := s.mapAccountNumber(account)
-	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
 	policy, err := generatePolicy("elasticfilesystem:*", "kms:*")
 	if err != nil {
 		return nil, err
@@ -593,14 +581,7 @@ func (s *server) filesystemDelete(ctx context.Context, account, group, fs string
 
 		msgChan, errChan := s.startTask(fsCtx, task)
 
-		var err error
-
-		// TODO The following mapping of account numbers and assumerole code should be updated
-		// once the filesystem orchestrations functions are moved to use account numbers (instead of
-		// aliases) and to use orchestrators instead of depending on the server struct.
-		acctNum := s.mapAccountNumber(account)
-
-		role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+		role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
 		policy, err := s.filesystemUserDeletePolicy()
 		if err != nil {
 			errChan <- err
@@ -625,7 +606,7 @@ func (s *server) filesystemDelete(ctx context.Context, account, group, fs string
 
 		orch := newUserOrchestrator(iamService, efsService, s.org)
 
-		users, err := orch.deleteAllFilesystemUsers(fsCtx, acctNum, group, fsid)
+		users, err := orch.deleteAllFilesystemUsers(fsCtx, group, fsid)
 		if err != nil {
 			errChan <- err
 			return
@@ -695,6 +676,108 @@ func (s *server) filesystemDelete(ctx context.Context, account, group, fs string
 	return task, nil
 }
 
+// filesystemList returns a list of elastic filesystems with the given org tag and the group/spaceid tag
+func (s *server) filesystemList(ctx context.Context, account, group string) ([]string, error) {
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
+	policy, err := generatePolicy("tag:*")
+	if err != nil {
+		return nil, err
+	}
+
+	session, err := s.assumeRole(
+		ctx,
+		s.session.ExternalID,
+		role,
+		policy,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	rgtService := resourcegroupstaggingapi.New(resourcegroupstaggingapi.WithSession(session.Session))
+
+	// build up tag filters starting with the org
+	tagFilters := []*resourcegroupstaggingapi.TagFilter{
+		{
+			Key:   "spinup:org",
+			Value: []string{s.org},
+		},
+	}
+
+	// if a group was passed, append a filter for the space id
+	if group != "" {
+		tagFilters = append(tagFilters, &resourcegroupstaggingapi.TagFilter{
+			Key:   "spinup:spaceid",
+			Value: []string{group},
+		})
+	}
+
+	// get a list of elastic filesystems matching the tag filters
+	out, err := rgtService.GetResourcesWithTags(ctx, []string{"elasticfilesystem"}, tagFilters)
+	if err != nil {
+		return nil, err
+	}
+
+	var fsList []string
+	for _, fs := range out {
+		a, err := arn.Parse(aws.StringValue(fs.ResourceARN))
+		if err != nil {
+			log.Errorf("failed to parse ARN %s: %s", fs, err)
+			fsList = append(fsList, aws.StringValue(fs.ResourceARN))
+		}
+
+		// skip any efs resources that is not a file-system (ie. access-point)
+		if !strings.HasPrefix(a.Resource, "file-system/") {
+			continue
+		}
+
+		fsid := strings.TrimPrefix(a.Resource, "file-system/")
+		if group == "" {
+			for _, t := range fs.Tags {
+				if aws.StringValue(t.Key) == "spinup:spaceid" {
+					fsid = aws.StringValue(t.Value) + "/" + fsid
+				}
+			}
+		}
+
+		fsList = append(fsList, fsid)
+	}
+
+	log.Debugf("returning list of filesystems in group %s: %+v", group, fsList)
+
+	return fsList, nil
+}
+
+// fileSystemExists checks if a filesystem exists in a group/space by getting a list of all filesystems
+// tagged with the spaceid and checking against that list. alternatively, we could get the filesystem from
+// the API and check if it has the right tag, but that seems more dangerous and less repeatable.  in other
+// words, this process might be slower but is hopefully safer.
+func (s *server) fileSystemExists(ctx context.Context, account, group, fs string) (bool, error) {
+	log.Debugf("checking if filesystem %s is in the group %s", fs, group)
+
+	list, err := s.filesystemList(ctx, account, group)
+	if err != nil {
+		return false, err
+	}
+
+	for _, f := range list {
+		id := f
+		if arn.IsARN(f) {
+			if a, err := arn.Parse(f); err != nil {
+				log.Errorf("failed to parse ARN %s: %s", f, err)
+			} else {
+				id = strings.TrimPrefix(a.Resource, "file-system/")
+			}
+		}
+
+		if id == fs {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // startTask starts the flywheel task and receives messages on the channels.  in the future, this
 // functionality might be part of the flywheel library
 func (s *server) startTask(ctx context.Context, task *flywheel.Task) (chan<- string, chan<- error) {
@@ -751,8 +834,7 @@ func (s *server) startTask(ctx context.Context, task *flywheel.Task) (chan<- str
 func (s *server) subnetAzs(ctx context.Context, account string, defSubnets []string) (map[string]string, error) {
 	log.Infof("determining availability zone for account %s and subnets %+v", account, defSubnets)
 
-	acctNum := s.mapAccountNumber(account)
-	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
 	policy, err := generatePolicy("ec2:*")
 	if err != nil {
 		return nil, err
