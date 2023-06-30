@@ -60,7 +60,7 @@ func (s *server) assumeRole(ctx context.Context, externalId, roleArn, inlinePoli
 	}
 
 	if policyArns != nil {
-		arns := []*sts.PolicyDescriptorType{}
+		var arns []*sts.PolicyDescriptorType
 		for _, a := range policyArns {
 			arns = append(arns, &sts.PolicyDescriptorType{
 				Arn: aws.String(a),

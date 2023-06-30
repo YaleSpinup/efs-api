@@ -26,16 +26,15 @@ import (
 
 // Config is representation of the configuration data
 type Config struct {
-	Account            Account
-	Accounts           map[string]Account
-	AccountsMap        map[string]string
-	DefaultKmsKeyAlias map[string]string
-	Flywheel           Flywheel
-	ListenAddress      string
-	LogLevel           string
-	Org                string
-	Token              string
-	Version            Version
+	Account       Account
+	AccountsMap   map[string]string
+	KmsKeyTags    []string
+	Flywheel      Flywheel
+	ListenAddress string
+	LogLevel      string
+	Org           string
+	Token         string
+	Version       Version
 }
 
 // Account is the configuration for an individual account

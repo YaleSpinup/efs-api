@@ -14,9 +14,8 @@ import (
 	"github.com/google/uuid"
 )
 
-func (s server) accessPointCreate(ctx context.Context, account, group, fsid string, req *AccessPointCreateRequest) (*AccessPoint, *flywheel.Task, error) {
-	acctNum := s.mapAccountNumber(account)
-	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+func (s *server) accessPointCreate(ctx context.Context, account, fsid string, req *AccessPointCreateRequest) (*AccessPoint, *flywheel.Task, error) {
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
 	policy, err := generatePolicy("elasticfilesystem:*", "kms:*")
 	if err != nil {
 		return nil, nil, apierror.New(apierror.ErrNotFound, "cannot generate policy", nil)
@@ -33,16 +32,12 @@ func (s server) accessPointCreate(ctx context.Context, account, group, fsid stri
 	}
 
 	kmsService := ykms.New(ykms.WithSession(session.Session))
-	defaultKmsKey, err := kmsService.GetKmsKeyId(ctx, s.getKMSKeyAlias(account))
+	kmsKeyId, err := kmsService.GetKmsKeyIdByTags(ctx, s.kmsKeyTags, s.org)
 	if err != nil {
-		return nil, nil, apierror.New(apierror.ErrInternalError, "failed to get KMS Key", nil)
+		return nil, nil, apierror.New(apierror.ErrInternalError, "failed to find kms key by tags", nil)
 	}
 
-	service := yefs.New(yefs.WithSession(session.Session),
-		yefs.WithDefaultKMSKeyId(acctNum, defaultKmsKey),
-		yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs),
-		yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets))
-
+	service := yefs.New(yefs.WithSession(session.Session), yefs.WithDefaultKMSKeyId(account, kmsKeyId))
 	filesystem, err := service.GetFileSystem(ctx, fsid)
 	if err != nil {
 		return nil, nil, err
@@ -54,7 +49,7 @@ func (s server) accessPointCreate(ctx context.Context, account, group, fsid stri
 	}
 
 	// using append here in case the filesystem as no tags
-	tags := []*efs.Tag{}
+	var tags []*efs.Tag
 	for _, t := range filesystem.Tags {
 		if aws.StringValue(t.Key) == "Name" {
 			name := fmt.Sprintf("%s-%s", aws.StringValue(filesystem.Name), req.Name)
@@ -131,9 +126,8 @@ func (s server) accessPointCreate(ctx context.Context, account, group, fsid stri
 	return ap, task, nil
 }
 
-func (s *server) listFilesystemAccessPoints(ctx context.Context, account, group, fsid string) ([]string, error) {
-	acctNum := s.mapAccountNumber(account)
-	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+func (s *server) listFilesystemAccessPoints(ctx context.Context, account, fsid string) ([]string, error) {
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
 	policy, err := generatePolicy("elasticfilesystem:*", "kms:*")
 	if err != nil {
 		return nil, err
@@ -150,22 +144,18 @@ func (s *server) listFilesystemAccessPoints(ctx context.Context, account, group,
 	}
 
 	kmsService := ykms.New(ykms.WithSession(session.Session))
-	defaultKmsKey, err := kmsService.GetKmsKeyId(ctx, s.getKMSKeyAlias(account))
+	kmsKeyId, err := kmsService.GetKmsKeyIdByTags(ctx, s.kmsKeyTags, s.org)
 	if err != nil {
-		return nil, apierror.New(apierror.ErrInternalError, "failed to get KMS Key", nil)
+		return nil, apierror.New(apierror.ErrInternalError, "failed to find kms key by tags", nil)
 	}
 
-	service := yefs.New(yefs.WithSession(session.Session),
-		yefs.WithDefaultKMSKeyId(acctNum, defaultKmsKey),
-		yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs),
-		yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets))
-
+	service := yefs.New(yefs.WithSession(session.Session), yefs.WithDefaultKMSKeyId(account, kmsKeyId))
 	out, err := service.ListAccessPoints(ctx, fsid)
 	if err != nil {
 		return nil, err
 	}
 
-	output := []string{}
+	var output []string
 	for _, ap := range out {
 		output = append(output, aws.StringValue(ap.AccessPointId))
 	}
@@ -173,9 +163,8 @@ func (s *server) listFilesystemAccessPoints(ctx context.Context, account, group,
 	return output, nil
 }
 
-func (s *server) getFilesystemAccessPoint(ctx context.Context, account, group, fsid, apid string) (*AccessPoint, error) {
-	acctNum := s.mapAccountNumber(account)
-	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+func (s *server) getFilesystemAccessPoint(ctx context.Context, account, apid string) (*AccessPoint, error) {
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
 	policy, err := generatePolicy("elasticfilesystem:*", "kms:*")
 	if err != nil {
 		return nil, err
@@ -192,15 +181,12 @@ func (s *server) getFilesystemAccessPoint(ctx context.Context, account, group, f
 	}
 
 	kmsService := ykms.New(ykms.WithSession(session.Session))
-	defaultKmsKey, err := kmsService.GetKmsKeyId(ctx, s.getKMSKeyAlias(account))
+	kmsKeyId, err := kmsService.GetKmsKeyIdByTags(ctx, s.kmsKeyTags, s.org)
 	if err != nil {
-		return nil, apierror.New(apierror.ErrInternalError, "failed to get KMS Key", nil)
+		return nil, apierror.New(apierror.ErrInternalError, "failed to find kms key by tags", nil)
 	}
 
-	service := yefs.New(yefs.WithSession(session.Session),
-		yefs.WithDefaultKMSKeyId(acctNum, defaultKmsKey),
-		yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs),
-		yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets))
+	service := yefs.New(yefs.WithSession(session.Session), yefs.WithDefaultKMSKeyId(account, kmsKeyId))
 
 	out, err := service.GetAccessPoint(ctx, apid)
 	if err != nil {
@@ -210,9 +196,9 @@ func (s *server) getFilesystemAccessPoint(ctx context.Context, account, group, f
 	return accessPointResponseFromEFS(out), nil
 }
 
-func (s *server) deleteFilesystemAccessPoint(ctx context.Context, account, group, fsid, apid string) error {
-	acctNum := s.mapAccountNumber(account)
-	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", acctNum, s.session.RoleName)
+// deleteFilesystemAccessPoint
+func (s *server) deleteFilesystemAccessPoint(ctx context.Context, account, apid string) error {
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
 	policy, err := generatePolicy("elasticfilesystem:*", "kms:*")
 	if err != nil {
 		return err
@@ -229,15 +215,12 @@ func (s *server) deleteFilesystemAccessPoint(ctx context.Context, account, group
 	}
 
 	kmsService := ykms.New(ykms.WithSession(session.Session))
-	defaultKmsKey, err := kmsService.GetKmsKeyId(ctx, s.getKMSKeyAlias(account))
+	kmsKeyId, err := kmsService.GetKmsKeyIdByTags(ctx, s.kmsKeyTags, s.org)
 	if err != nil {
-		return apierror.New(apierror.ErrInternalError, "failed to get KMS Key", nil)
+		return apierror.New(apierror.ErrInternalError, "failed to find kms key by tags", nil)
 	}
 
-	service := yefs.New(yefs.WithSession(session.Session),
-		yefs.WithDefaultKMSKeyId(acctNum, defaultKmsKey),
-		yefs.WithDefaultSgs(s.efsServices[account].DefaultSgs),
-		yefs.WithDefaultSubnets(s.efsServices[account].DefaultSubnets))
+	service := yefs.New(yefs.WithSession(session.Session), yefs.WithDefaultKMSKeyId(account, kmsKeyId))
 
 	if err := service.DeleteAccessPoint(ctx, apid); err != nil {
 		return err

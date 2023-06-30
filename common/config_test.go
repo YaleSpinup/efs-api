@@ -64,21 +64,6 @@ func TestReadConfig(t *testing.T) {
 			Role:       "uber-role",
 			ExternalID: "foobar",
 		},
-		Accounts: map[string]Account{
-			"provider1": {
-				Region:          "us-east-1",
-				Akid:            "key1",
-				Secret:          "secret1",
-				DefaultKmsKeyId: "arn:aws:kms:us-east-1:11111111111:key/xyxyxyxyxyxyxyxyx",
-				DefaultSgs:      []string{"sg-xxxxxx", "sg-yyyyyy"},
-				DefaultSubnets:  []string{"subnet-xxxxxxx", "subnet-yyyyyy"},
-			},
-			"provider2": {
-				Region: "us-west-1",
-				Akid:   "key2",
-				Secret: "secret2",
-			},
-		},
 		Token:    "SEKRET",
 		LogLevel: "info",
 		Org:      "test",
