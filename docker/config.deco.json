@@ -7,28 +7,10 @@
     "externalId": "{{ .external_id }}",
     "role": "{{ .cross_account_role }}"
   },
-  "accounts": {
-    "spinup": {
-      "region": "us-east-1",
-      "akid": "{{ .spinup_akid }}",
-      "secret": "{{ .spinup_secret }}",
-      "defaultSgs": ["{{ .spinup_default_sg }}"],
-      "defaultSubnets": {{ .spinup_default_subnet }},
-      "defaultKmsKeyId": "{{ .spinup_default_kms_key_id }}"
-    },
-    "spinupsec": {
-      "region": "us-east-1",
-      "akid": "{{ .spinupsec_akid }}",
-      "secret": "{{ .spinupsec_secret }}",
-      "defaultSgs": ["{{ .spinupsec_default_sg }}"],
-      "defaultSubnets": {{ .spinupsec_default_subnet }},
-      "defaultKmsKeyId": "{{ .spinupsec_default_kms_key_id }}"
-    }
-  },
-  "defaultKmsKeyAlias":{
-    "spinup": "alias/spinup-ecs-api-dev",
-    "spinupsec": "alias/spinup-ecs-api-dev"
-  },
+  "kmsKeyTags": [
+    "spinup:default:partner",
+    "spinup:default:org"
+  ],
   "accountsMap": {
     "spinup": "{{ .spinup_account_number }}",
     "spinupsec": "{{ .spinupsec_account_number }}"
@@ -41,5 +23,5 @@
   },
   "token": "{{ .api_token }}",
   "logLevel": "{{ .log_level }}",
-  "org": "{{ .spinup_org }}"
+  "org": "{{ .org }}"
 }
