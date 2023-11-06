@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/YaleSpinup/apierror"
+	yefs "github.com/YaleSpinup/efs-api/efs"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -16,14 +17,8 @@ import (
 func (s *server) FileSystemCreateHandler(w http.ResponseWriter, r *http.Request) {
 	w = LogWriter{w}
 	vars := mux.Vars(r)
-	account := vars["account"]
+	account := s.mapAccountNumber(vars["account"])
 	group := vars["group"]
-	_, ok := s.efsServices[account]
-	if !ok {
-		log.Errorf("account not found: %s", account)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
 
 	req := FileSystemCreateRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -49,17 +44,84 @@ func (s *server) FileSystemCreateHandler(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("X-Flywheel-Task", task.ID)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
-	w.Write(j)
+
+	_, err = w.Write(j)
+	if err != nil {
+		handleError(w, apierror.New(apierror.ErrInternalError, "error writing response", err))
+	}
 }
 
-// FileSystemListHandler lists all of the filesystems in a group by id
+// FileSystemUpdateHandler updates a filesystem by id
+func (s *server) FileSystemUpdateHandler(w http.ResponseWriter, r *http.Request) {
+	w = LogWriter{w}
+	vars := mux.Vars(r)
+	account := s.mapAccountNumber(vars["account"])
+	group := vars["group"]
+	fs := vars["id"]
+
+	if exists, err := s.fileSystemExists(r.Context(), account, group, fs); err != nil {
+		handleError(w, err)
+	} else if !exists {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	req := FileSystemUpdateRequest{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		msg := fmt.Sprintf("cannot decode body into update filesystem input: %s", err)
+		handleError(w, apierror.New(apierror.ErrBadRequest, msg, err))
+		return
+	}
+
+	task, err := s.filesystemUpdate(r.Context(), account, group, fs, &req)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+
+	w.Header().Set("X-Flywheel-Task", task.ID)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+
+	_, err = w.Write([]byte("OK"))
+	if err != nil {
+		handleError(w, apierror.New(apierror.ErrInternalError, "error writing response", err))
+	}
+}
+
+// FileSystemDeleteHandler deletes a filesystem by id
+func (s *server) FileSystemDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	w = LogWriter{w}
+	vars := mux.Vars(r)
+	account := s.mapAccountNumber(vars["account"])
+	group := vars["group"]
+	fs := vars["id"]
+
+	task, err := s.filesystemDelete(r.Context(), account, group, fs)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+
+	w.Header().Set("X-Flywheel-Task", task.ID)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+
+	_, err = w.Write([]byte("OK"))
+	if err != nil {
+		handleError(w, apierror.New(apierror.ErrInternalError, "error writing response", err))
+	}
+}
+
+// FileSystemListHandler lists all the filesystems in a group by id
 func (s *server) FileSystemListHandler(w http.ResponseWriter, r *http.Request) {
 	w = LogWriter{w}
 	vars := mux.Vars(r)
-	account := vars["account"]
+	account := s.mapAccountNumber(vars["account"])
 	group := vars["group"]
 
-	out, err := s.listFileSystems(r.Context(), account, group)
+	out, err := s.filesystemList(r.Context(), account, group)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -75,23 +137,42 @@ func (s *server) FileSystemListHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(j)
+
+	_, err = w.Write(j)
+	if err != nil {
+		handleError(w, apierror.New(apierror.ErrInternalError, "error writing response", err))
+	}
 }
 
 // FileSystemShowHandler gets the details if a filesystem by id
 func (s *server) FileSystemShowHandler(w http.ResponseWriter, r *http.Request) {
 	w = LogWriter{w}
 	vars := mux.Vars(r)
-	account := vars["account"]
+	account := s.mapAccountNumber(vars["account"])
 	group := vars["group"]
 	fs := vars["id"]
 
-	efsService, ok := s.efsServices[account]
-	if !ok {
-		log.Errorf("account not found: %s", account)
-		w.WriteHeader(http.StatusNotFound)
+	role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, s.session.RoleName)
+	policy, err := generatePolicy("elasticfilesystem:*", "kms:*")
+	if err != nil {
+		log.Errorf("cannot generate policy for role: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	session, err := s.assumeRole(
+		r.Context(),
+		s.session.ExternalID,
+		role,
+		policy,
+	)
+	if err != nil {
+		log.Errorf("cannot assume role: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	efsService := yefs.New(yefs.WithSession(session.Session))
 
 	if exists, err := s.fileSystemExists(r.Context(), account, group, fs); err != nil {
 		handleError(w, err)
@@ -141,13 +222,13 @@ func (s *server) FileSystemShowHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	policy, err := filSystemAccessPolicyFromEfsPolicy(policyString)
+	fsPolicy, err := filSystemAccessPolicyFromEfsPolicy(policyString)
 	if err != nil {
 		handleError(w, err)
 		return
 	}
 
-	output := fileSystemResponseFromEFS(filesystem, mounttargets, accessPoints, policy, backup, transitionToIA, transitionToPrimary)
+	output := fileSystemResponseFromEFS(filesystem, mounttargets, accessPoints, fsPolicy, backup, transitionToIA, transitionToPrimary)
 	j, err := json.Marshal(output)
 	if err != nil {
 		log.Errorf("cannot marshal response (%v) into JSON: %s", output, err)
@@ -157,74 +238,9 @@ func (s *server) FileSystemShowHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(j)
-}
 
-// FileSystemDeleteHandler deletes a filesystem by id
-func (s *server) FileSystemDeleteHandler(w http.ResponseWriter, r *http.Request) {
-	w = LogWriter{w}
-	vars := mux.Vars(r)
-	account := vars["account"]
-	group := vars["group"]
-	fs := vars["id"]
-
-	_, ok := s.efsServices[account]
-	if !ok {
-		log.Errorf("account not found: %s", account)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	task, err := s.filesystemDelete(r.Context(), account, group, fs)
+	_, err = w.Write(j)
 	if err != nil {
-		handleError(w, err)
-		return
+		handleError(w, apierror.New(apierror.ErrInternalError, "error writing response", err))
 	}
-
-	w.Header().Set("X-Flywheel-Task", task.ID)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	w.Write([]byte("OK"))
-}
-
-// FileSystemUpdateHandler updates a filesystem by id
-func (s *server) FileSystemUpdateHandler(w http.ResponseWriter, r *http.Request) {
-	w = LogWriter{w}
-	vars := mux.Vars(r)
-	account := vars["account"]
-	group := vars["group"]
-	fs := vars["id"]
-
-	_, ok := s.efsServices[account]
-	if !ok {
-		log.Errorf("account not found: %s", account)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	if exists, err := s.fileSystemExists(r.Context(), account, group, fs); err != nil {
-		handleError(w, err)
-	} else if !exists {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	req := FileSystemUpdateRequest{}
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		msg := fmt.Sprintf("cannot decode body into update filesystem input: %s", err)
-		handleError(w, apierror.New(apierror.ErrBadRequest, msg, err))
-		return
-	}
-
-	task, err := s.filesystemUpdate(r.Context(), account, group, fs, &req)
-	if err != nil {
-		handleError(w, err)
-		return
-	}
-
-	w.Header().Set("X-Flywheel-Task", task.ID)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	w.Write([]byte("OK"))
 }

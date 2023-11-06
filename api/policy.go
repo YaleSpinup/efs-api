@@ -213,11 +213,9 @@ func efsPolicyFromFileSystemAccessPolicy(account, group, fsArn string, policy *F
 		log.Debugf("generated ecs task execution role arn: %s", roleArn)
 
 		ecsPolicy := iam.StatementEntry{
-			Sid:    "AllowECSAccessFromHomeSpace",
-			Effect: "Allow",
-			Principal: iam.Principal{
-				"AWS": []string{roleArn},
-			},
+			Sid:       "AllowECSAccessFromHomeSpace",
+			Effect:    "Allow",
+			Principal: iam.Principal{"AWS": []string{"*"}},
 			Action: []string{
 				"elasticfilesystem:ClientRootAccess",
 				"elasticfilesystem:ClientWrite",
@@ -265,4 +263,26 @@ func filSystemAccessPolicyFromEfsPolicy(policy string) (*FileSystemAccessPolicy,
 	}
 
 	return &accessPolicy, nil
+}
+
+func generatePolicy(actions ...string) (string, error) {
+	log.Debugf("generating %v policy document", actions)
+
+	policy := iam.PolicyDocument{
+		Version: "2012-10-17",
+		Statement: []iam.StatementEntry{
+			{
+				Effect:   "Allow",
+				Action:   actions,
+				Resource: []string{"*"},
+			},
+		},
+	}
+
+	j, err := json.Marshal(policy)
+	if err != nil {
+		return "", err
+	}
+
+	return string(j), nil
 }

@@ -16,6 +16,7 @@ import (
 
 // ResourceGroupsTaggingAPI is a wrapper around the aws resourcegroupstaggingapi service with some default config info
 type ResourceGroupsTaggingAPI struct {
+	session *session.Session
 	Service resourcegroupstaggingapiiface.ResourceGroupsTaggingAPIAPI
 }
 
@@ -23,6 +24,29 @@ type ResourceGroupsTaggingAPI struct {
 type TagFilter struct {
 	Key   string
 	Value []string
+}
+
+type ResourceGroupsTaggingAPIOption func(*ResourceGroupsTaggingAPI)
+
+func New(opts ...ResourceGroupsTaggingAPIOption) ResourceGroupsTaggingAPI {
+	e := ResourceGroupsTaggingAPI{}
+
+	for _, opt := range opts {
+		opt(&e)
+	}
+
+	if e.session != nil {
+		e.Service = resourcegroupstaggingapi.New(e.session)
+	}
+
+	return e
+}
+
+func WithSession(sess *session.Session) ResourceGroupsTaggingAPIOption {
+	return func(e *ResourceGroupsTaggingAPI) {
+		log.Debug("using aws session")
+		e.session = sess
+	}
 }
 
 // NewSession creates a new cloudfront session

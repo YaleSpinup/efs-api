@@ -12,7 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (o *userOrchestrator) createFilesystemUser(ctx context.Context, account, group, fsid string, req *FileSystemUserCreateRequest) (*FileSystemUserResponse, error) {
+func (o *userOrchestrator) createFilesystemUser(ctx context.Context, group, fsid string, req *FileSystemUserCreateRequest) (*FileSystemUserResponse, error) {
 	filesystem, err := o.efsClient.GetFileSystem(ctx, fsid)
 	if err != nil {
 		return nil, err
@@ -44,11 +44,11 @@ func (o *userOrchestrator) createFilesystemUser(ctx context.Context, account, gr
 		return nil, err
 	}
 
-	return filesystemUserResponseFromIAM(o.org, user, nil), nil
+	return filesystemUserResponseFromIAM(user, nil), nil
 }
 
 // deleteFilesystemUser deletes a filesystem user and all associated access keys
-func (o *userOrchestrator) deleteFilesystemUser(ctx context.Context, account, group, fsid, user string) error {
+func (o *userOrchestrator) deleteFilesystemUser(ctx context.Context, group, fsid, user string) error {
 	filesystem, err := o.efsClient.GetFileSystem(ctx, fsid)
 	if err != nil {
 		return err
@@ -92,15 +92,15 @@ func (o *userOrchestrator) deleteFilesystemUser(ctx context.Context, account, gr
 }
 
 // deleteAllFilesystemUsers deletes all users for a repository
-func (o *userOrchestrator) deleteAllFilesystemUsers(ctx context.Context, account, group, fsid string) ([]string, error) {
+func (o *userOrchestrator) deleteAllFilesystemUsers(ctx context.Context, group, fsid string) ([]string, error) {
 	// list all users for the repository
-	users, err := o.listFilesystemUsers(ctx, account, group, fsid)
+	users, err := o.listFilesystemUsers(ctx, group, fsid)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, u := range users {
-		if err := o.deleteFilesystemUser(ctx, account, group, fsid, u); err != nil {
+		if err := o.deleteFilesystemUser(ctx, group, fsid, u); err != nil {
 			log.Errorf("failed to delete filesystem %s user %s: %s", fsid, u, err)
 		}
 	}
@@ -109,7 +109,7 @@ func (o *userOrchestrator) deleteAllFilesystemUsers(ctx context.Context, account
 }
 
 // listFilesystemUsers lists the IAM users in a path specific to the filesystem
-func (o *userOrchestrator) listFilesystemUsers(ctx context.Context, account, group, fsid string) ([]string, error) {
+func (o *userOrchestrator) listFilesystemUsers(ctx context.Context, group, fsid string) ([]string, error) {
 	filesystem, err := o.efsClient.GetFileSystem(ctx, fsid)
 	if err != nil {
 		return nil, err
@@ -137,7 +137,7 @@ func (o *userOrchestrator) listFilesystemUsers(ctx context.Context, account, gro
 }
 
 // getFilesystemUser gets the details about a filesystem user with the username generated from the fs name and the passed username
-func (o *userOrchestrator) getFilesystemUser(ctx context.Context, account, group, fsid, user string) (*FileSystemUserResponse, error) {
+func (o *userOrchestrator) getFilesystemUser(ctx context.Context, group, fsid, user string) (*FileSystemUserResponse, error) {
 	filesystem, err := o.efsClient.GetFileSystem(ctx, fsid)
 	if err != nil {
 		return nil, err
@@ -157,11 +157,11 @@ func (o *userOrchestrator) getFilesystemUser(ctx context.Context, account, group
 		return nil, err
 	}
 
-	return filesystemUserResponseFromIAM(o.org, iamUser, keys), nil
+	return filesystemUserResponseFromIAM(iamUser, keys), nil
 }
 
 // updateFilesystemUser updates a user for a filesystem
-func (o *userOrchestrator) updateFilesystemUser(ctx context.Context, account, group, fsid, user string, req *FileSystemUserUpdateRequest) (*FileSystemUserResponse, error) {
+func (o *userOrchestrator) updateFilesystemUser(ctx context.Context, group, fsid, user string, req *FileSystemUserUpdateRequest) (*FileSystemUserResponse, error) {
 	filesystem, err := o.efsClient.GetFileSystem(ctx, fsid)
 	if err != nil {
 		return nil, err
@@ -170,7 +170,7 @@ func (o *userOrchestrator) updateFilesystemUser(ctx context.Context, account, gr
 	name := aws.StringValue(filesystem.Name)
 	userName := fmt.Sprintf("%s-%s", name, user)
 
-	if _, err := o.getFilesystemUser(ctx, account, group, fsid, user); err != nil {
+	if _, err := o.getFilesystemUser(ctx, group, fsid, user); err != nil {
 		return nil, err
 	}
 

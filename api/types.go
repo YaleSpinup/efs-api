@@ -1,15 +1,11 @@
 package api
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/YaleSpinup/apierror"
-	"github.com/YaleSpinup/efs-api/resourcegroupstaggingapi"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/aws/awsutil"
 	"github.com/aws/aws-sdk-go/service/efs"
 	"github.com/aws/aws-sdk-go/service/iam"
@@ -340,95 +336,6 @@ func fileSystemResponseFromEFS(fs *efs.FileSystemDescription, mts []*efs.MountTa
 	return &filesystem
 }
 
-// listFileSystems returns a list of elasticfilesystems with the given org tag and the group/spaceid tag
-func (s *server) listFileSystems(ctx context.Context, account, group string) ([]string, error) {
-	rgtService, ok := s.rgTaggingAPIServices[account]
-	if !ok {
-		return nil, apierror.New(apierror.ErrNotFound, "account not found", nil)
-	}
-
-	// build up tag filters starting with the org
-	tagFilters := []*resourcegroupstaggingapi.TagFilter{
-		{
-			Key:   "spinup:org",
-			Value: []string{s.org},
-		},
-	}
-
-	// if a group was passed, append a filter for the space id
-	if group != "" {
-		tagFilters = append(tagFilters, &resourcegroupstaggingapi.TagFilter{
-			Key:   "spinup:spaceid",
-			Value: []string{group},
-		})
-	}
-
-	// get a list of elastic filesystems matching the tag filters
-	out, err := rgtService.GetResourcesWithTags(ctx, []string{"elasticfilesystem"}, tagFilters)
-	if err != nil {
-		return nil, err
-	}
-
-	fsList := []string{}
-	for _, fs := range out {
-		a, err := arn.Parse(aws.StringValue(fs.ResourceARN))
-		if err != nil {
-			log.Errorf("failed to parse ARN %s: %s", fs, err)
-			fsList = append(fsList, aws.StringValue(fs.ResourceARN))
-		}
-
-		// skip any efs resources that is not a file-system (ie. access-point)
-		if !strings.HasPrefix(a.Resource, "file-system/") {
-			continue
-		}
-
-		fsid := strings.TrimPrefix(a.Resource, "file-system/")
-		if group == "" {
-			for _, t := range fs.Tags {
-				if aws.StringValue(t.Key) == "spinup:spaceid" {
-					fsid = aws.StringValue(t.Value) + "/" + fsid
-				}
-			}
-		}
-
-		fsList = append(fsList, fsid)
-	}
-
-	log.Debugf("returning list of filesystems in group %s: %+v", group, fsList)
-
-	return fsList, nil
-}
-
-// fileSystemExists checks if a filesystem exists in a group/space by getting a list of all filesystems
-// tagged with the spaceid and checking against that list. alternatively, we could get the filesystem from
-// the API and check if it has the right tag, but that seems more dangerous and less repeatable.  in other
-// words, this process might be slower but is hopefully safer.
-func (s *server) fileSystemExists(ctx context.Context, account, group, fs string) (bool, error) {
-	log.Debugf("checking if filesystem %s is in the group %s", fs, group)
-
-	list, err := s.listFileSystems(ctx, account, group)
-	if err != nil {
-		return false, err
-	}
-
-	for _, f := range list {
-		id := f
-		if arn.IsARN(f) {
-			if a, err := arn.Parse(f); err != nil {
-				log.Errorf("failed to parse ARN %s: %s", f, err)
-			} else {
-				id = strings.TrimPrefix(a.Resource, "file-system/")
-			}
-		}
-
-		if id == fs {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
 // AccessPointCreateRequest is the input for creating an access point
 type AccessPointCreateRequest struct {
 	Name string
@@ -450,7 +357,7 @@ func accessPointResponseFromEFS(ap *efs.AccessPointDescription) *AccessPoint {
 }
 
 // filesystemUserResponseFromIAM maps IAM response to a common struct
-func filesystemUserResponseFromIAM(org string, u *iam.User, keys []*iam.AccessKeyMetadata) *FileSystemUserResponse {
+func filesystemUserResponseFromIAM(u *iam.User, keys []*iam.AccessKeyMetadata) *FileSystemUserResponse {
 	log.Debugf("mapping iam user %s", awsutil.Prettify(u))
 
 	userName := aws.StringValue(u.UserName)
