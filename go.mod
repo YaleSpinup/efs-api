@@ -3,9 +3,9 @@ module github.com/YaleSpinup/efs-api
 go 1.21
 
 require (
-	github.com/YaleSpinup/apierror v0.1.2
+	github.com/YaleSpinup/apierror v0.1.5
 	github.com/YaleSpinup/aws-go v0.2.3
-	github.com/YaleSpinup/flywheel v0.3.2
+	github.com/YaleSpinup/flywheel v0.3.6
 	github.com/aws/aws-sdk-go v1.47.9
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
