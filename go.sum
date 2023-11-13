@@ -1,9 +1,9 @@
-github.com/YaleSpinup/apierror v0.1.2 h1:IDM4NmGt/r+4eq1uW5/XkqqmVAow3raE970KqkbVFYQ=
-github.com/YaleSpinup/apierror v0.1.2/go.mod h1:LV0WGRJVWuvfSQo4fMx8hd0MV7thE2n5Mh2syENWG7k=
+github.com/YaleSpinup/apierror v0.1.5 h1:ZW59fFo+bO30GpQ3TvGNBlY7kdX8L9KIEkaztsKnwiY=
+github.com/YaleSpinup/apierror v0.1.5/go.mod h1:u2smW7kQNefbVbBpNNvHQj9TjLZdVC+fKxwKNtLIhb4=
 github.com/YaleSpinup/aws-go v0.2.3 h1:5k28oLcZ7N0I03pxasOBvWG5HSyhxdgWRBajE02Dt4o=
 github.com/YaleSpinup/aws-go v0.2.3/go.mod h1:sAHykjX3XIhS/Ff+cj7duydbHpZXt3iSpbfXgjU5XuM=
-github.com/YaleSpinup/flywheel v0.3.2 h1:vsZbJVSZNx4K0J061DhmWfzqnpRvSoPi0nMyNLRlCc4=
-github.com/YaleSpinup/flywheel v0.3.2/go.mod h1:Lb1n+r+orMv9GevLyX2t4u5KWbJdOTrvYm9DjIsGzJg=
+github.com/YaleSpinup/flywheel v0.3.6 h1:TjG3RSh+0rI83beetP2H7H5NTlnxwUismgv541imhjc=
+github.com/YaleSpinup/flywheel v0.3.6/go.mod h1:9Qo7aa1Wn+e4bSwzIOZyV25Y8fKUpFu4Bx0fA7henRU=
 github.com/aws/aws-sdk-go v1.47.9 h1:rarTsos0mA16q+huicGx0e560aYRtOucV5z2Mw23JRY=
 github.com/aws/aws-sdk-go v1.47.9/go.mod h1:LF8svs817+Nz+DmiMQKTO3ubZ/6IaTpq3TjupRn3Eqk=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
