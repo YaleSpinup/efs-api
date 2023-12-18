@@ -6,7 +6,7 @@ require (
 	github.com/YaleSpinup/apierror v0.1.2
 	github.com/YaleSpinup/aws-go v0.2.3
 	github.com/YaleSpinup/flywheel v0.3.2
-	github.com/aws/aws-sdk-go v1.47.9
+	github.com/aws/aws-sdk-go v1.49.4
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-redis/redis/v8 v8.11.5 // indirect
