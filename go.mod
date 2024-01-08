@@ -19,8 +19,8 @@ require (
 	github.com/prometheus/common v0.45.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/sirupsen/logrus v1.9.3
-	golang.org/x/crypto v0.15.0
-	golang.org/x/sys v0.14.0 // indirect
+	golang.org/x/crypto v0.18.0
+	golang.org/x/sys v0.16.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 )
 
